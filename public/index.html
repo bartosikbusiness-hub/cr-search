@@ -143,6 +143,9 @@
     tbody tr:nth-child(odd)  { background: var(--row); }
     tbody tr:nth-child(even) { background: var(--row-alt); }
     tbody tr:hover           { background: #28284a; }
+    tbody tr.in-stock        { background: #0e2a1a; }
+    tbody tr.in-stock:nth-child(even) { background: #112d1c; }
+    tbody tr.in-stock:hover  { background: #174023; }
 
     tbody td {
       padding        : .6rem 1rem;
@@ -495,7 +498,11 @@
         ? `<span class="ts">${new Date(e.lastUpdated).toLocaleString('cs-CZ', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}</span>`
         : '<span class="ts">—</span>';
 
-      return `<tr>
+      const crInStock     = (e.cr_quantity ?? e.quantity ?? 0) > 0;
+      const najadaInStock = (e.najada_articles || []).some(a => a.quantity > 0);
+      const rowClass      = (crInStock || najadaInStock) ? ' class="in-stock"' : '';
+
+      return `<tr${rowClass}>
         <td class="col-num">${i + 1}</td>
         <td class="col-name">${esc(e.name)}</td>
         <td class="col-edition">${esc(e.edition)}</td>

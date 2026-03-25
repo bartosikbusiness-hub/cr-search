@@ -3,10 +3,9 @@
   "configurations": [
     {
       "name": "cr-search",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["server.js"],
-      "port": 3000,
-      "cwd": "${workspaceFolder}"
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "node server.js"],
+      "port": 3000
     }
   ]
 }
