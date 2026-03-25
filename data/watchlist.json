@@ -1,0 +1,58 @@
+[
+  {
+    "id": "1774001464412",
+    "name": "intuition",
+    "edition": "Tempest",
+    "price": 6499,
+    "quantity": 0,
+    "lastUpdated": "2026-03-25T15:18:12.657Z"
+  },
+  {
+    "id": "1774001488218",
+    "name": "sphere of law",
+    "edition": "Odyssey",
+    "price": 35,
+    "quantity": 0,
+    "lastUpdated": "2026-03-25T15:18:13.069Z"
+  },
+  {
+    "id": "1774001503567",
+    "name": "masticore",
+    "edition": "Urza's Destiny",
+    "price": 999,
+    "quantity": 0,
+    "lastUpdated": "2026-03-25T15:18:13.545Z"
+  },
+  {
+    "id": "1774283494779",
+    "name": "flooded strand",
+    "edition": "Onslaught",
+    "price": 1999,
+    "quantity": 0,
+    "lastUpdated": "2026-03-25T15:18:13.905Z"
+  },
+  {
+    "id": "1774283508199",
+    "name": "ancient tomb",
+    "edition": "Tempest",
+    "price": 2999,
+    "quantity": 0,
+    "lastUpdated": "2026-03-25T15:18:14.233Z"
+  },
+  {
+    "id": "1774283538167",
+    "name": "Undiscovered Paradise",
+    "edition": "Visions",
+    "price": 649,
+    "quantity": 0,
+    "lastUpdated": "2026-03-25T15:18:14.611Z"
+  },
+  {
+    "id": "1774283569289",
+    "name": "Misdirection",
+    "edition": "Mercadian Masques",
+    "price": 849,
+    "quantity": 0,
+    "lastUpdated": "2026-03-25T15:18:14.910Z"
+  }
+]

@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Černý rytíř – vyhledávač karet</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg      : #0f0f17;
+      --panel   : #18182a;
+      --row     : #1e1e30;
+      --row-alt : #22223a;
+      --border  : #2e2e50;
+      --glow    : #5e4ec0;
+      --text    : #dcdcf0;
+      --muted   : #7878a8;
+      --green   : #34d97b;
+      --gold    : #f0c040;
+      --purple  : #a060f0;
+      --red     : #f04f5e;
+      --radius  : 8px;
+    }
+
+    body {
+      background  : var(--bg);
+      color       : var(--text);
+      font-family : 'Segoe UI', system-ui, sans-serif;
+      min-height  : 100vh;
+      display     : flex;
+      flex-direction: column;
+      align-items : center;
+      padding     : 2rem 1rem 4rem;
+      gap         : 2rem;
+    }
+
+    h1 {
+      font-size   : 1.6rem;
+      font-weight : 700;
+      background  : linear-gradient(90deg, #a060f0, #4fa6f0);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* ── Sekce ── */
+    .section {
+      width     : 100%;
+      max-width : 900px;
+    }
+
+    .section-title {
+      font-size    : .78rem;
+      font-weight  : 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color        : var(--muted);
+      margin-bottom: .6rem;
+    }
+
+    /* ── Search bar ── */
+    .search-bar {
+      display : flex;
+      gap     : .6rem;
+    }
+
+    input[type="text"], select {
+      background  : var(--panel);
+      border      : 1px solid var(--border);
+      border-radius: var(--radius);
+      color       : var(--text);
+      font        : inherit;
+      font-size   : .95rem;
+      padding     : .55rem 1rem;
+      outline     : none;
+      transition  : border-color .15s;
+    }
+    input[type="text"] { flex: 1; }
+    input[type="text"]:focus, select:focus { border-color: var(--glow); }
+    input[type="text"]::placeholder { color: var(--muted); }
+    select { cursor: pointer; }
+    select option { background: var(--panel); }
+
+    button {
+      background  : var(--purple);
+      border      : none;
+      border-radius: var(--radius);
+      color       : #fff;
+      font        : inherit;
+      font-size   : .92rem;
+      font-weight : 600;
+      padding     : .55rem 1.2rem;
+      cursor      : pointer;
+      transition  : background .15s;
+      white-space : nowrap;
+    }
+    button:hover    { background: #8040d8; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+
+    button.btn-danger { background: #7a1020; }
+    button.btn-danger:hover { background: var(--red); }
+
+    button.btn-outline {
+      background  : transparent;
+      border      : 1px solid var(--border);
+      color       : var(--text);
+    }
+    button.btn-outline:hover { background: var(--border); }
+
+    /* ── Info řádek ── */
+    .result-info {
+      font-size : .82rem;
+      color     : var(--muted);
+      margin-bottom: .5rem;
+      min-height: 1.2em;
+    }
+
+    /* ── Tabulka ── */
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width           : 100%;
+      border-collapse : collapse;
+      font-size       : .9rem;
+      background      : var(--panel);
+      border-radius   : var(--radius);
+      overflow        : hidden;
+    }
+
+    thead th {
+      padding        : .65rem 1rem;
+      text-align     : left;
+      font-size      : .75rem;
+      font-weight    : 700;
+      letter-spacing : .07em;
+      text-transform : uppercase;
+      color          : var(--muted);
+      border-bottom  : 1px solid var(--border);
+      white-space    : nowrap;
+    }
+
+    tbody tr:nth-child(odd)  { background: var(--row); }
+    tbody tr:nth-child(even) { background: var(--row-alt); }
+    tbody tr:hover           { background: #28284a; }
+
+    tbody td {
+      padding        : .6rem 1rem;
+      border-bottom  : 1px solid var(--border);
+      vertical-align : middle;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+
+    .col-num     { width: 3rem; text-align: right; color: var(--muted); font-size: .8rem; font-family: monospace; }
+    .col-name    { font-weight: 500; }
+    .col-edition { color: var(--muted); font-size: .82rem; }
+    .col-price   { font-family: monospace; font-weight: 700; white-space: nowrap; }
+    .col-qty     { font-family: monospace; font-size: .88rem; white-space: nowrap; }
+    .col-action  { width: 2.5rem; text-align: center; }
+
+    .qty-ok   { color: var(--green); }
+    .qty-low  { color: var(--gold); }
+    .qty-zero { color: var(--muted); }
+
+    .ts { font-size: .75rem; color: var(--muted); }
+
+    /* ── Watchlist add form ── */
+    .watchlist-form {
+      display  : flex;
+      gap      : .6rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .watchlist-form input { flex: 1; min-width: 160px; }
+    .watchlist-form select { min-width: 180px; }
+
+    /* ── Watchlist toolbar ── */
+    .watchlist-toolbar {
+      display        : flex;
+      justify-content: space-between;
+      align-items    : center;
+      margin-bottom  : .6rem;
+      flex-wrap      : wrap;
+      gap            : .5rem;
+    }
+
+    .btn-remove {
+      background  : transparent;
+      border      : none;
+      color       : var(--muted);
+      font-size   : 1rem;
+      cursor      : pointer;
+      padding     : 0 .3rem;
+      line-height : 1;
+      transition  : color .15s;
+    }
+    .btn-remove:hover { color: var(--red); background: transparent; }
+
+    /* ── Spinner ── */
+    .spinner {
+      display     : inline-block;
+      width       : 28px; height: 28px;
+      border      : 3px solid var(--border);
+      border-top  : 3px solid var(--purple);
+      border-radius: 50%;
+      animation   : spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .spinner-row td { text-align: center; padding: 2rem; }
+
+    .empty { color: var(--muted); padding: 1.5rem 1rem; font-size: .9rem; }
+  </style>
+</head>
+<body>
+
+<h1>🔍 Černý rytíř – vyhledávač karet</h1>
+
+<!-- ── Vyhledávání ───────────────────────────────────────────────────────── -->
+<div class="section">
+  <div class="section-title">Vyhledávání</div>
+  <div class="search-bar">
+    <input type="text" id="q" placeholder="Zadej název karty, např. Lightning Bolt…" autocomplete="off" />
+    <button id="btn-search" onclick="doSearch()">Hledat</button>
+  </div>
+  <div class="result-info" id="result-info"></div>
+  <div class="table-wrap" id="search-output"></div>
+</div>
+
+<!-- ── Watchlist ─────────────────────────────────────────────────────────── -->
+<div class="section">
+  <div class="section-title">Watchlist</div>
+
+  <div class="watchlist-form">
+    <input type="text" id="wl-name" placeholder="Název karty, např. Counterspell" autocomplete="off" />
+    <select id="wl-edition"><option value="">— vyber edici —</option></select>
+    <button onclick="addToWatchlist()">Přidat</button>
+  </div>
+
+  <div class="watchlist-toolbar">
+    <span class="result-info" id="wl-info"></span>
+    <button onclick="refreshWatchlist()">↻ Aktualizovat ceny</button>
+  </div>
+
+  <div class="table-wrap">
+    <table id="wl-table">
+      <thead>
+        <tr>
+          <th class="col-num">#</th>
+          <th>Název</th>
+          <th>Edice</th>
+          <th>Cena</th>
+          <th>Sklad</th>
+          <th>Aktualizováno</th>
+          <th class="col-action"></th>
+        </tr>
+      </thead>
+      <tbody id="wl-body">
+        <tr><td colspan="7" class="empty">Watchlist je prázdný.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  /* ── Init ── */
+  document.getElementById('q').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doSearch();
+  });
+  document.getElementById('wl-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addToWatchlist();
+  });
+
+  loadEditions();
+  loadWatchlist();
+
+  /* ── Editions dropdown ── */
+  async function loadEditions() {
+    const res  = await fetch('/api/editions');
+    const list = await res.json();
+    const sel  = document.getElementById('wl-edition');
+    list.forEach(e => {
+      const opt = document.createElement('option');
+      opt.value = opt.textContent = e;
+      sel.appendChild(opt);
+    });
+  }
+
+  /* ── Search ── */
+  async function doSearch() {
+    const q    = document.getElementById('q').value.trim();
+    const btn  = document.getElementById('btn-search');
+    const out  = document.getElementById('search-output');
+    const info = document.getElementById('result-info');
+    if (!q) return;
+
+    btn.disabled    = true;
+    btn.textContent = 'Hledám…';
+    out.innerHTML   = '<div style="padding:2rem;text-align:center"><div class="spinner"></div></div>';
+    info.textContent = '';
+
+    try {
+      const res  = await fetch('/api/search?q=' + encodeURIComponent(q));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      info.textContent = `Nalezeno ${data.count} výsledků pro „${data.query}"`;
+
+      if (data.count === 0) {
+        out.innerHTML = '<div class="empty">Žádné výsledky.</div>';
+        return;
+      }
+
+      const rows = data.cards.map((c, i) => `
+        <tr>
+          <td class="col-num">${i + 1}</td>
+          <td class="col-name">${esc(c.name)}</td>
+          <td class="col-edition">${esc(c.edition)}</td>
+          <td class="col-price">${fmt(c.price)}</td>
+          <td class="col-qty ${qtyClass(c.quantity)}">${c.quantity} ks</td>
+        </tr>`).join('');
+
+      out.innerHTML = `<table>
+        <thead><tr>
+          <th class="col-num">#</th><th>Název</th><th>Edice</th><th>Cena</th><th>Sklad</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+
+    } catch (err) {
+      out.innerHTML    = `<div class="empty">Chyba: ${esc(err.message)}</div>`;
+      info.textContent = '';
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = 'Hledat';
+    }
+  }
+
+  /* ── Watchlist load ── */
+  async function loadWatchlist() {
+    const res  = await fetch('/api/watchlist');
+    const list = await res.json();
+    renderWatchlist(list);
+  }
+
+  /* ── Watchlist add ── */
+  async function addToWatchlist() {
+    const name    = document.getElementById('wl-name').value.trim();
+    const edition = document.getElementById('wl-edition').value;
+    if (!name || !edition) { alert('Zadej název karty a vyber edici.'); return; }
+
+    const res  = await fetch('/api/watchlist', {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body   : JSON.stringify({ name, edition }),
+    });
+    const entry = await res.json();
+    if (!res.ok) { alert(entry.error); return; }
+
+    document.getElementById('wl-name').value = '';
+    document.getElementById('wl-edition').value = '';
+    await loadWatchlist();
+  }
+
+  /* ── Watchlist remove ── */
+  async function removeFromWatchlist(id) {
+    await fetch('/api/watchlist/' + id, { method: 'DELETE' });
+    await loadWatchlist();
+  }
+
+  /* ── Watchlist refresh ── */
+  async function refreshWatchlist() {
+    const btn  = document.querySelector('button[onclick="refreshWatchlist()"]');
+    const info = document.getElementById('wl-info');
+
+    btn.disabled    = true;
+    btn.textContent = '↻ Aktualizuji…';
+    info.textContent = 'Načítám ceny ze serveru…';
+
+    // Zobraz spinner v tabulce
+    const tbody = document.getElementById('wl-body');
+    tbody.innerHTML = '<tr class="spinner-row"><td colspan="7"><div class="spinner"></div></td></tr>';
+
+    try {
+      const res  = await fetch('/api/watchlist/refresh', { method: 'POST' });
+      const list = await res.json();
+      if (!res.ok) throw new Error(list.error);
+      renderWatchlist(list);
+      info.textContent = `Aktualizováno ${new Date().toLocaleTimeString('cs-CZ')}`;
+    } catch (err) {
+      info.textContent = 'Chyba: ' + err.message;
+      await loadWatchlist();
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = '↻ Aktualizovat ceny';
+    }
+  }
+
+  /* ── Render watchlist table ── */
+  function renderWatchlist(list) {
+    const tbody = document.getElementById('wl-body');
+
+    if (!list || list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">Watchlist je prázdný.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = list.map((e, i) => {
+      const price = e.price !== null ? fmt(e.price) : '–';
+      const qty   = e.quantity !== null
+        ? `<span class="${qtyClass(e.quantity)}">${e.quantity} ks</span>`
+        : '–';
+      const ts    = e.lastUpdated
+        ? `<span class="ts">${new Date(e.lastUpdated).toLocaleString('cs-CZ', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}</span>`
+        : '<span class="ts">—</span>';
+
+      return `<tr>
+        <td class="col-num">${i + 1}</td>
+        <td class="col-name">${esc(e.name)}</td>
+        <td class="col-edition">${esc(e.edition)}</td>
+        <td class="col-price">${price}</td>
+        <td class="col-qty">${qty}</td>
+        <td>${ts}</td>
+        <td class="col-action"><button class="btn-remove" title="Odebrat" onclick="removeFromWatchlist('${e.id}')">✕</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  /* ── Helpers ── */
+  function qtyClass(q) {
+    return q === 0 ? 'qty-zero' : q <= 3 ? 'qty-low' : 'qty-ok';
+  }
+
+  function fmt(n) {
+    return (n || 0).toLocaleString('cs-CZ') + ' Kč';
+  }
+
+  function esc(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+</body>
+</html>
