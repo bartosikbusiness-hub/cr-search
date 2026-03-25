@@ -297,14 +297,13 @@
           <th>Edice</th>
           <th><span class="badge-cr">CR</span> Cena</th>
           <th><span class="badge-cr">CR</span> Sklad</th>
-          <th><span class="badge-najada">NAJÁDA</span> Cena</th>
-          <th><span class="badge-najada">NAJÁDA</span> Sklad</th>
+          <th><span class="badge-najada">NAJÁDA</span> Kvality skladem</th>
           <th>Aktualizováno</th>
           <th class="col-action"></th>
         </tr>
       </thead>
       <tbody id="wl-body">
-        <tr><td colspan="9" class="empty">Watchlist je prázdný.</td></tr>
+        <tr><td colspan="8" class="empty">Watchlist je prázdný.</td></tr>
       </tbody>
     </table>
   </div>
@@ -443,7 +442,7 @@
 
     // Zobraz spinner v tabulce
     const tbody = document.getElementById('wl-body');
-    tbody.innerHTML = '<tr class="spinner-row"><td colspan="9"><div class="spinner"></div></td></tr>';
+    tbody.innerHTML = '<tr class="spinner-row"><td colspan="8"><div class="spinner"></div></td></tr>';
 
     try {
       const res  = await fetch('/api/watchlist/refresh', { method: 'POST' });
@@ -477,16 +476,20 @@
       const crPriceCell = crPrice !== null ? `<span class="col-price">${fmt(crPrice)}</span>` : '–';
       const crQtyCell   = crQty   !== null ? `<span class="${qtyClass(crQty)}">${crQty} ks</span>` : '–';
 
-      // Najáda
-      const njPrice = e.najada_price    ?? null;
-      const njQty   = e.najada_quantity ?? null;
-      const njCond  = e.najada_condition;
-
-      const njCondTag   = njCond && njCond !== '–'
-        ? `<span class="cond cond-${njCond}">${esc(njCond)}</span> `
-        : '';
-      const njPriceCell = njPrice !== null ? `${njCondTag}<span class="col-price">${fmt(njPrice)}</span>` : '–';
-      const njQtyCell   = njQty   !== null ? `<span class="${qtyClass(njQty)}">${njQty} ks</span>` : '–';
+      // Najáda – všechny naskladněné kvality
+      const articles = e.najada_articles || [];
+      let njCell;
+      if (articles.length === 0) {
+        njCell = '<span style="color:var(--muted)">–</span>';
+      } else {
+        njCell = articles.map(a => {
+          const condTag = a.condition && a.condition !== '–'
+            ? `<span class="cond cond-${a.condition}">${esc(a.condition)}</span> `
+            : '';
+          const qtySpan = `<span class="${qtyClass(a.quantity)}">${a.quantity} ks</span>`;
+          return `<div style="white-space:nowrap">${condTag}<span class="col-price">${fmt(a.price)}</span> ${qtySpan}</div>`;
+        }).join('');
+      }
 
       const ts = e.lastUpdated
         ? `<span class="ts">${new Date(e.lastUpdated).toLocaleString('cs-CZ', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}</span>`
@@ -498,8 +501,7 @@
         <td class="col-edition">${esc(e.edition)}</td>
         <td>${crPriceCell}</td>
         <td class="col-qty">${crQtyCell}</td>
-        <td>${njPriceCell}</td>
-        <td class="col-qty">${njQtyCell}</td>
+        <td>${njCell}</td>
         <td>${ts}</td>
         <td class="col-action"><button class="btn-remove" title="Odebrat" onclick="removeFromWatchlist('${e.id}')">✕</button></td>
       </tr>`;

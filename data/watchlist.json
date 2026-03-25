@@ -5,12 +5,19 @@
     "edition": "Tempest",
     "price": 6499,
     "quantity": 0,
-    "lastUpdated": "2026-03-25T21:14:48.474Z",
+    "lastUpdated": "2026-03-25T21:22:38.395Z",
     "cr_price": 6499,
     "cr_quantity": 0,
     "najada_price": 7499,
     "najada_quantity": 0,
-    "najada_condition": "NM"
+    "najada_condition": "NM",
+    "najada_articles": [
+      {
+        "price": 7499,
+        "quantity": 0,
+        "condition": "NM"
+      }
+    ]
   },
   {
     "id": "1774001488218",
@@ -18,12 +25,19 @@
     "edition": "Odyssey",
     "price": 35,
     "quantity": 0,
-    "lastUpdated": "2026-03-25T21:14:48.973Z",
+    "lastUpdated": "2026-03-25T21:22:38.769Z",
     "cr_price": 35,
     "cr_quantity": 0,
     "najada_price": 35,
     "najada_quantity": 0,
-    "najada_condition": "NM"
+    "najada_condition": "NM",
+    "najada_articles": [
+      {
+        "price": 35,
+        "quantity": 0,
+        "condition": "NM"
+      }
+    ]
   },
   {
     "id": "1774001503567",
@@ -31,12 +45,19 @@
     "edition": "Urza's Destiny",
     "price": 999,
     "quantity": 0,
-    "lastUpdated": "2026-03-25T21:14:49.369Z",
+    "lastUpdated": "2026-03-25T21:22:39.152Z",
     "cr_price": 999,
     "cr_quantity": 0,
     "najada_price": 1059,
     "najada_quantity": 1,
-    "najada_condition": "PL"
+    "najada_condition": "PL",
+    "najada_articles": [
+      {
+        "price": 1059,
+        "quantity": 1,
+        "condition": "PL"
+      }
+    ]
   },
   {
     "id": "1774283494779",
@@ -44,12 +65,24 @@
     "edition": "Onslaught",
     "price": 1999,
     "quantity": 0,
-    "lastUpdated": "2026-03-25T21:14:49.746Z",
+    "lastUpdated": "2026-03-25T21:22:39.502Z",
     "cr_price": 1999,
     "cr_quantity": 0,
     "najada_price": 1499,
     "najada_quantity": 1,
-    "najada_condition": "HP"
+    "najada_condition": "HP",
+    "najada_articles": [
+      {
+        "price": 1499,
+        "quantity": 1,
+        "condition": "HP"
+      },
+      {
+        "price": 1699,
+        "quantity": 1,
+        "condition": "PL"
+      }
+    ]
   },
   {
     "id": "1774283508199",
@@ -57,12 +90,24 @@
     "edition": "Tempest",
     "price": 2999,
     "quantity": 0,
-    "lastUpdated": "2026-03-25T21:14:50.166Z",
+    "lastUpdated": "2026-03-25T21:22:39.859Z",
     "cr_price": 2999,
     "cr_quantity": 0,
     "najada_price": 2549,
     "najada_quantity": 1,
-    "najada_condition": "PL"
+    "najada_condition": "PL",
+    "najada_articles": [
+      {
+        "price": 2549,
+        "quantity": 1,
+        "condition": "PL"
+      },
+      {
+        "price": 2849,
+        "quantity": 1,
+        "condition": "EX"
+      }
+    ]
   },
   {
     "id": "1774283538167",
@@ -70,12 +115,19 @@
     "edition": "Visions",
     "price": 649,
     "quantity": 0,
-    "lastUpdated": "2026-03-25T21:14:50.786Z",
+    "lastUpdated": "2026-03-25T21:22:40.561Z",
     "cr_price": 649,
     "cr_quantity": 0,
     "najada_price": 699,
     "najada_quantity": 0,
-    "najada_condition": "NM"
+    "najada_condition": "NM",
+    "najada_articles": [
+      {
+        "price": 699,
+        "quantity": 0,
+        "condition": "NM"
+      }
+    ]
   },
   {
     "id": "1774283569289",
@@ -83,11 +135,18 @@
     "edition": "Mercadian Masques",
     "price": 849,
     "quantity": 0,
-    "lastUpdated": "2026-03-25T21:14:51.126Z",
+    "lastUpdated": "2026-03-25T21:22:40.865Z",
     "cr_price": 849,
     "cr_quantity": 0,
     "najada_price": 849,
     "najada_quantity": 0,
-    "najada_condition": "NM"
+    "najada_condition": "NM",
+    "najada_articles": [
+      {
+        "price": 849,
+        "quantity": 0,
+        "condition": "NM"
+      }
+    ]
   }
 ]

@@ -369,19 +369,19 @@ app.post('/api/watchlist/refresh', async (req, res) => {
         entry.cr_quantity = null;
       }
 
-      // Najáda – vezmi nejlevnější skladem, jinak nejlevnější celkově
+      // Najáda – ulož VŠECHNY naskladněné kvality, seřazené od nejlevnější
       if (najadaSettled[i].status === 'fulfilled') {
-        const cards    = najadaSettled[i].value.filter(editionMatch);
-        const inStock  = cards.filter(c => c.quantity > 0);
-        const pool     = inStock.length ? inStock : cards;
-        const best     = pool.sort((a, b) => a.price - b.price)[0] || null;
-        entry.najada_price     = best ? best.price     : null;
-        entry.najada_quantity  = best ? best.quantity  : null;
-        entry.najada_condition = best ? best.condition : null;
+        const cards   = najadaSettled[i].value.filter(editionMatch);
+        const inStock = cards.filter(c => c.quantity > 0).sort((a, b) => a.price - b.price);
+        // Pokud nic není skladem, ulož referenční cenu (nejlevnější)
+        const fallback = !inStock.length ? cards.sort((a, b) => a.price - b.price).slice(0, 1) : [];
+        entry.najada_articles = (inStock.length ? inStock : fallback).map(a => ({
+          price    : a.price,
+          quantity : a.quantity,
+          condition: a.condition,
+        }));
       } else {
-        entry.najada_price     = null;
-        entry.najada_quantity  = null;
-        entry.najada_condition = null;
+        entry.najada_articles = [];
       }
 
       entry.lastUpdated = new Date().toISOString();
