@@ -18,6 +18,18 @@ app.use(express.static(path.join(__dirname, 'public')));
 /* ─── Pre-Modern legální edice (Fourth Edition – Scourge, 1995–2003) ──────── */
 
 const PREMODERN_EDITIONS = [
+  // Staré sady (pre-4th)
+  'Arabian Nights',
+  'Antiquities',
+  'Legends', 'Legends Italian', 'Italian Legends', 'Leggende',
+  'The Dark',
+  'Fallen Empires',
+  'Alpha', 'Limited Edition Alpha',
+  'Beta', 'Limited Edition Beta',
+  'Unlimited',
+  '3rd Edition', 'Revised Edition', 'Revised',
+  'Asian Black Bordered', 'Asian BB',
+  'Foreign Black Bordered', 'FBB',
   // Základní sady
   '4th Edition', 'Fourth Edition',
   '5th Edition', 'Fifth Edition',
@@ -41,8 +53,12 @@ const PREMODERN_EDITIONS = [
   'Onslaught', 'Legions', 'Scourge',
 ];
 
-// Zobrazitelné názvy edicí pro frontend dropdown
+// Zobrazitelné názvy edicí pro frontend dropdown (chronologicky)
 const EDITION_LABELS = [
+  'Arabian Nights', 'Antiquities', 'Legends', 'Legends Italian',
+  'The Dark', 'Fallen Empires',
+  'Alpha', 'Beta', 'Unlimited', '3rd Edition',
+  'Asian Black Bordered', 'Foreign Black Bordered',
   'Fourth Edition', 'Ice Age', 'Chronicles', 'Homelands', 'Alliances',
   'Mirage', 'Visions', 'Fifth Edition', 'Weatherlight',
   'Tempest', 'Stronghold', 'Exodus',
@@ -58,8 +74,12 @@ function normalizeApos(s) {
 }
 
 function isPremodern(edition) {
-  const e = normalizeApos(edition).toLowerCase();
-  return PREMODERN_EDITIONS.some(pat => e.includes(normalizeApos(pat).toLowerCase()));
+  const e = normalizeApos(edition).toLowerCase().trim();
+  return PREMODERN_EDITIONS.some(pat => {
+    const p = normalizeApos(pat).toLowerCase().trim();
+    // Exact match nebo edition začíná vzorem (následovaným non-word znakem nebo koncem)
+    return e === p || (e.startsWith(p) && (e.length === p.length || /\W/.test(e[p.length])));
+  });
 }
 
 /* ─── Watchlist persistence ──────────────────────────────────────────────── */
@@ -161,27 +181,88 @@ async function searchAllPages(page, q) {
   return allCards;
 }
 
+/* ─── Najada API search ──────────────────────────────────────────────────── */
+
+const NAJADA_GAME_ID = '40e972fe-c136-4d66-b61a-89f6be0f93d5';
+
+async function searchNajada(query) {
+  const url = `https://najada.games/api/v1/najada2/catalog/mtg-singles/` +
+    `?expansion__game=${NAJADA_GAME_ID}&o=price&in_stock=false` +
+    `&q=${encodeURIComponent(query)}&article_price_min=0&article_price_max=10000000&limit=200&offset=0`;
+
+  const resp = await fetch(url, {
+    headers: {
+      'User-Agent': USER_AGENT,
+      'Accept'    : 'application/json',
+      'Referer'   : 'https://www.najada.games/',
+    },
+  });
+
+  if (!resp.ok) throw new Error(`Najada API vrátila ${resp.status}`);
+
+  const json    = await resp.json();
+  const results = [];
+
+  for (const item of json.results || []) {
+    const edition = item.expansion?.localized_name || '';
+    if (!isPremodern(edition)) continue;
+
+    for (const article of item.articles || []) {
+      results.push({
+        name     : item.localized_name || item.name,
+        edition,
+        price    : article.effective_price_czk,
+        quantity : article.total_availability || 0,
+        condition: article.condition || '–',
+        shop     : 'Najáda',
+      });
+    }
+  }
+
+  return results;
+}
+
 /* ─── Search endpoint ────────────────────────────────────────────────────── */
 
 app.get('/api/search', async (req, res) => {
-  const q = (req.query.q || '').trim();
+  const q     = (req.query.q || '').trim();
+  const shops = (req.query.shops || 'cr,najada').split(',').map(s => s.trim());
   if (!q) return res.status(400).json({ error: 'Chybí parametr q' });
 
-  let browser;
-  try {
-    browser = await chromium.launch({ headless: true });
-    const ctx  = await browser.newContext({ userAgent: USER_AGENT });
-    const page = await ctx.newPage();
+  const tasks = [];
 
-    const allCards = await searchAllPages(page, q);
-    const filtered = allCards.filter(c => isPremodern(c.edition));
-    res.json({ query: q, count: filtered.length, cards: filtered });
-  } catch (err) {
-    console.error('[search] Chyba:', err.message);
-    res.status(500).json({ error: err.message });
-  } finally {
-    if (browser) await browser.close();
+  if (shops.includes('cr')) {
+    tasks.push((async () => {
+      let browser;
+      try {
+        browser = await chromium.launch({ headless: true });
+        const ctx  = await browser.newContext({ userAgent: USER_AGENT });
+        const page = await ctx.newPage();
+        const all  = await searchAllPages(page, q);
+        return all
+          .filter(c => isPremodern(c.edition))
+          .map(c => ({ ...c, condition: '–', shop: 'Černý Rytíř' }));
+      } finally {
+        if (browser) await browser.close();
+      }
+    })());
   }
+
+  if (shops.includes('najada')) {
+    tasks.push(searchNajada(q));
+  }
+
+  const settled = await Promise.allSettled(tasks);
+  const cards   = [];
+  const errors  = [];
+
+  for (const s of settled) {
+    if (s.status === 'fulfilled') cards.push(...s.value);
+    else errors.push(s.reason?.message || String(s.reason));
+  }
+
+  if (errors.length) console.error('[search] Errors:', errors);
+  res.json({ query: q, count: cards.length, cards, errors });
 });
 
 /* ─── Editions endpoint (pro frontend dropdown) ──────────────────────────── */
@@ -224,25 +305,55 @@ app.post('/api/watchlist/refresh', async (req, res) => {
   const list = loadWatchlist();
   if (list.length === 0) return res.json([]);
 
+  // Najada – všechny karty paralelně přes API
+  const najadaSettled = await Promise.allSettled(
+    list.map(entry => searchNajada(entry.name))
+  );
+
+  // CR – sekvenčně přes jeden Playwright browser
   let browser;
   try {
     browser = await chromium.launch({ headless: true });
     const ctx  = await browser.newContext({ userAgent: USER_AGENT });
     const page = await ctx.newPage();
 
-    for (const entry of list) {
-      const results = await searchAllPages(page, entry.name);
-      // Najdi řádek kde edice odpovídá
+    for (let i = 0; i < list.length; i++) {
+      const entry   = list[i];
       const entryEd = normalizeApos(entry.edition).toLowerCase();
-      const match = results.find(c => {
+
+      function editionMatch(c) {
         const cardEd = normalizeApos(c.edition).toLowerCase();
         return cardEd.includes(entryEd) || entryEd.includes(cardEd);
-      });
-      if (match) {
-        entry.price       = match.price;
-        entry.quantity    = match.quantity;
-        entry.lastUpdated = new Date().toISOString();
       }
+
+      // CR
+      try {
+        const crAll   = await searchAllPages(page, entry.name);
+        const crMatch = crAll.find(editionMatch) || null;
+        entry.cr_price    = crMatch ? crMatch.price    : null;
+        entry.cr_quantity = crMatch ? crMatch.quantity : null;
+      } catch (e) {
+        console.error(`[watchlist/refresh] CR chyba pro "${entry.name}":`, e.message);
+        entry.cr_price    = null;
+        entry.cr_quantity = null;
+      }
+
+      // Najáda – vezmi nejlevnější skladem, jinak nejlevnější celkově
+      if (najadaSettled[i].status === 'fulfilled') {
+        const cards    = najadaSettled[i].value.filter(editionMatch);
+        const inStock  = cards.filter(c => c.quantity > 0);
+        const pool     = inStock.length ? inStock : cards;
+        const best     = pool.sort((a, b) => a.price - b.price)[0] || null;
+        entry.najada_price     = best ? best.price     : null;
+        entry.najada_quantity  = best ? best.quantity  : null;
+        entry.najada_condition = best ? best.condition : null;
+      } else {
+        entry.najada_price     = null;
+        entry.najada_quantity  = null;
+        entry.najada_condition = null;
+      }
+
+      entry.lastUpdated = new Date().toISOString();
     }
 
     saveWatchlist(list);
