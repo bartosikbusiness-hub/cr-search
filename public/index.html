@@ -44,11 +44,7 @@
       background-clip: text;
     }
 
-    /* ── Sekce ── */
-    .section {
-      width     : 100%;
-      max-width : 900px;
-    }
+    .section { width: 100%; max-width: 900px; }
 
     .section-title {
       font-size    : .78rem;
@@ -59,13 +55,9 @@
       margin-bottom: .6rem;
     }
 
-    /* ── Search bar ── */
-    .search-bar {
-      display : flex;
-      gap     : .6rem;
-    }
+    .search-bar { display: flex; gap: .6rem; }
 
-    input[type="text"], select {
+    input[type="text"], input[type="password"], select {
       background  : var(--panel);
       border      : 1px solid var(--border);
       border-radius: var(--radius);
@@ -76,9 +68,9 @@
       outline     : none;
       transition  : border-color .15s;
     }
-    input[type="text"] { flex: 1; }
-    input[type="text"]:focus, select:focus { border-color: var(--glow); }
-    input[type="text"]::placeholder { color: var(--muted); }
+    input[type="text"], input[type="password"] { flex: 1; }
+    input[type="text"]:focus, input[type="password"]:focus, select:focus { border-color: var(--glow); }
+    input[type="text"]::placeholder, input[type="password"]::placeholder { color: var(--muted); }
     select { cursor: pointer; }
     select option { background: var(--panel); }
 
@@ -108,7 +100,11 @@
     }
     button.btn-outline:hover { background: var(--border); }
 
-    /* ── Info řádek ── */
+    button.btn-sm {
+      font-size : .8rem;
+      padding   : .35rem .8rem;
+    }
+
     .result-info {
       font-size : .82rem;
       color     : var(--muted);
@@ -116,7 +112,6 @@
       min-height: 1.2em;
     }
 
-    /* ── Tabulka ── */
     .table-wrap { overflow-x: auto; }
 
     table {
@@ -165,9 +160,6 @@
     .qty-low  { color: var(--gold); }
     .qty-zero { color: var(--muted); }
 
-    .ts { font-size: .75rem; color: var(--muted); }
-
-    /* ── Watchlist add form ── */
     .watchlist-form {
       display  : flex;
       gap      : .6rem;
@@ -177,7 +169,6 @@
     .watchlist-form input { flex: 1; min-width: 160px; }
     .watchlist-form select { min-width: 180px; }
 
-    /* ── Watchlist toolbar ── */
     .watchlist-toolbar {
       display        : flex;
       justify-content: space-between;
@@ -185,6 +176,13 @@
       margin-bottom  : .6rem;
       flex-wrap      : wrap;
       gap            : .5rem;
+    }
+
+    .watchlist-toolbar-left, .watchlist-toolbar-right {
+      display    : flex;
+      align-items: center;
+      gap        : .5rem;
+      flex-wrap  : wrap;
     }
 
     .btn-remove {
@@ -199,7 +197,6 @@
     }
     .btn-remove:hover { color: var(--red); background: transparent; }
 
-    /* ── Spinner ── */
     .spinner {
       display     : inline-block;
       width       : 28px; height: 28px;
@@ -214,7 +211,6 @@
 
     .empty { color: var(--muted); padding: 1.5rem 1rem; font-size: .9rem; }
 
-    /* ── Shop checkboxes ── */
     .shop-select {
       display    : flex;
       gap        : 1.2rem;
@@ -235,11 +231,9 @@
       accent-color: var(--purple);
     }
 
-    /* ── Shop badge ── */
     .badge-cr     { color: #f0a040; font-size: .72rem; font-weight: 700; }
     .badge-najada { color: #40c0f0; font-size: .72rem; font-weight: 700; }
 
-    /* ── Condition tag ── */
     .cond {
       font-size   : .75rem;
       font-weight : 700;
@@ -253,9 +247,163 @@
     .cond-MP { color: var(--gold); }
     .cond-HP { color: #f08040; }
     .cond-D  { color: var(--red); }
+
+    .nj-price { font-family: monospace; font-weight: 700; white-space: nowrap; }
+    .nj-qty   { font-family: monospace; font-size: .88rem; white-space: nowrap; }
+
+    /* ── Auth overlay ── */
+    #auth-overlay {
+      position  : fixed;
+      inset     : 0;
+      background: rgba(0,0,0,.75);
+      display   : flex;
+      align-items: center;
+      justify-content: center;
+      z-index   : 100;
+      backdrop-filter: blur(4px);
+    }
+    #auth-overlay.hidden { display: none; }
+
+    #auth-modal {
+      background   : var(--panel);
+      border       : 1px solid var(--border);
+      border-radius: 12px;
+      padding      : 2rem;
+      width        : 100%;
+      max-width    : 400px;
+      display      : flex;
+      flex-direction: column;
+      gap          : 1.2rem;
+    }
+
+    .auth-close {
+      position : absolute;
+      top       : .8rem;
+      right     : .8rem;
+      background: transparent;
+      border    : none;
+      color     : var(--muted);
+      font-size : 1.3rem;
+      cursor    : pointer;
+      padding   : .2rem .5rem;
+      line-height: 1;
+      border-radius: 4px;
+    }
+    .auth-close:hover { color: var(--text); background: var(--border); }
+
+    #auth-modal { position: relative; }
+
+    #auth-modal h2 {
+      font-size  : 1.2rem;
+      font-weight: 700;
+      background : linear-gradient(90deg, #a060f0, #4fa6f0);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    #auth-modal p { font-size: .88rem; color: var(--muted); }
+
+    .auth-tabs {
+      display  : flex;
+      gap      : .5rem;
+    }
+
+    .auth-tab {
+      flex       : 1;
+      background : transparent;
+      border     : 1px solid var(--border);
+      color      : var(--muted);
+      font-size  : .85rem;
+      padding    : .45rem;
+    }
+    .auth-tab:hover    { background: var(--border); color: var(--text); }
+    .auth-tab.active   { background: var(--glow); border-color: var(--glow); color: #fff; }
+
+    .auth-section { display: flex; flex-direction: column; gap: .7rem; }
+    .auth-section.hidden { display: none; }
+
+    .auth-error { font-size: .82rem; color: var(--red); min-height: 1.1em; }
+
+    /* ── Import modal ── */
+    #import-overlay {
+      position  : fixed; inset: 0;
+      background: rgba(0,0,0,.7);
+      display   : flex; align-items: center; justify-content: center;
+      z-index   : 110; backdrop-filter: blur(4px);
+    }
+    #import-overlay.hidden { display: none; }
+    #import-modal {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 12px; padding: 2rem;
+      width: 100%; max-width: 600px;
+      display: flex; flex-direction: column; gap: 1.2rem;
+      position: relative;
+    }
+    #import-modal h2 { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+    #import-modal p  { font-size: .83rem; color: var(--muted); }
+    #import-textarea {
+      width: 100%; min-height: 160px;
+      background: var(--bg); border: 1px solid var(--border);
+      color: var(--text); border-radius: 6px;
+      padding: .7rem; font-family: monospace; font-size: .85rem; resize: vertical;
+    }
+    #import-preview { max-height: 260px; overflow-y: auto; }
+    #import-preview table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+    #import-preview th { color: var(--muted); font-weight: 600; text-align: left; padding: .3rem .5rem; border-bottom: 1px solid var(--border); }
+    #import-preview td { padding: .3rem .5rem; border-bottom: 1px solid var(--border); }
+    .import-ok   { color: var(--green); }
+    .import-warn { color: var(--gold); }
+    .import-row-skip td { opacity: .45; }
+    .import-actions { display: flex; gap: .7rem; justify-content: flex-end; }
   </style>
 </head>
 <body>
+
+<!-- ── Import overlay ───────────────────────────────────────────────────── -->
+<div id="import-overlay" class="hidden">
+  <div id="import-modal">
+    <button class="auth-close" onclick="hideImportModal()">✕</button>
+    <h2>⬆ Import z Moxfieldu</h2>
+    <p>Vlož export z Moxfieldu (nebo libovolný text ve formátu <code>Název karty (KÓD)</code>, jeden řádek = jedna karta). Množství je ignorováno.</p>
+    <textarea id="import-textarea" placeholder="1 Lightning Bolt (3ED)&#10;4 Counterspell (MMQ)&#10;2 Flooded Strand (ONS)"></textarea>
+    <div>
+      <button onclick="parseImport()" style="background:var(--glow)" id="btn-analyze">Analyzovat</button>
+      <span id="import-parse-info" style="font-size:.82rem;color:var(--muted);margin-left:.8rem"></span>
+    </div>
+    <div id="import-preview" class="hidden"></div>
+    <div class="import-actions hidden" id="import-actions">
+      <button onclick="hideImportModal()" style="background:var(--panel);border:1px solid var(--border);color:var(--muted)">Zrušit</button>
+      <button onclick="confirmImport()" style="background:var(--green);color:#000">✓ Importovat</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Auth overlay ──────────────────────────────────────────────────────── -->
+<div id="auth-overlay" class="hidden">
+  <div id="auth-modal">
+    <button class="auth-close" title="Zavřít" onclick="hideAuthModal()">✕</button>
+    <h2>🔐 Watchlist</h2>
+    <p>Pro přístup k watchlistu zadej heslo. Heslo slouží jako klíč – kdo ho zná, může watchlist upravovat.</p>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchAuthTab('open')">Otevřít existující</button>
+      <button class="auth-tab"        onclick="switchAuthTab('create')">Vytvořit nový</button>
+    </div>
+
+    <div class="auth-section" id="tab-open">
+      <input type="password" id="auth-pw-open" placeholder="Tvoje heslo" autocomplete="current-password" />
+      <button onclick="doLogin()">Otevřít watchlist</button>
+      <div class="auth-error" id="auth-err-open"></div>
+    </div>
+
+    <div class="auth-section hidden" id="tab-create">
+      <input type="password" id="auth-pw-create" placeholder="Zvol heslo (min. 4 znaky)" autocomplete="new-password" />
+      <button onclick="doCreate()">Vytvořit watchlist</button>
+      <div class="auth-error" id="auth-err-create"></div>
+    </div>
+  </div>
+</div>
 
 <h1>🔍 MTG vyhledávač karet</h1>
 
@@ -284,11 +432,17 @@
     <input type="text" id="wl-name" placeholder="Název karty, např. Counterspell" autocomplete="off" />
     <select id="wl-edition"><option value="">— vyber edici —</option></select>
     <button onclick="addToWatchlist()">Přidat</button>
+    <button onclick="showImportModal()" style="background:var(--panel);border:1px solid var(--border);color:var(--text)">⬆ Import</button>
   </div>
 
   <div class="watchlist-toolbar">
-    <span class="result-info" id="wl-info"></span>
-    <button onclick="refreshWatchlist()">↻ Aktualizovat ceny</button>
+    <div class="watchlist-toolbar-left" id="wl-auth-area">
+      <!-- Sem JS dosadí buď přihlašovací tlačítko nebo odhlásit/smazat -->
+    </div>
+    <div class="watchlist-toolbar-right">
+      <span class="result-info" id="wl-info" style="margin:0"></span>
+      <button onclick="refreshWatchlist()">↻ Aktualizovat ceny</button>
+    </div>
   </div>
 
   <div class="table-wrap">
@@ -300,29 +454,128 @@
           <th>Edice</th>
           <th><span class="badge-cr">CR</span> Cena</th>
           <th><span class="badge-cr">CR</span> Sklad</th>
-          <th><span class="badge-najada">NAJÁDA</span> Kvality skladem</th>
-          <th>Aktualizováno</th>
+          <th><span class="badge-najada">NJ</span> Stav</th>
+          <th><span class="badge-najada">NJ</span> Cena</th>
+          <th><span class="badge-najada">NJ</span> Sklad</th>
           <th class="col-action"></th>
         </tr>
       </thead>
       <tbody id="wl-body">
-        <tr><td colspan="8" class="empty">Watchlist je prázdný.</td></tr>
+        <tr><td colspan="9" class="empty">Watchlist je prázdný.</td></tr>
       </tbody>
     </table>
   </div>
 </div>
 
 <script>
+  const TOKEN_KEY = 'cr_wl_token';
+
+  /* ── Helpers ── */
+  function getToken()       { return localStorage.getItem(TOKEN_KEY); }
+  function setToken(t)      { localStorage.setItem(TOKEN_KEY, t); }
+  function clearToken()     { localStorage.removeItem(TOKEN_KEY); }
+
+  function authHeaders() {
+    return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() };
+  }
+
+  function qtyClass(q) { return q === 0 ? 'qty-zero' : q <= 3 ? 'qty-low' : 'qty-ok'; }
+  function fmt(n)       { return (n || 0).toLocaleString('cs-CZ') + ' Kč'; }
+  function esc(s)       { return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function escRe(s)     { return (s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
   /* ── Init ── */
-  document.getElementById('q').addEventListener('keydown', e => {
-    if (e.key === 'Enter') doSearch();
-  });
-  document.getElementById('wl-name').addEventListener('keydown', e => {
-    if (e.key === 'Enter') addToWatchlist();
-  });
+  document.getElementById('q').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+  document.getElementById('wl-name').addEventListener('keydown', e => { if (e.key === 'Enter') addToWatchlist(); });
+  document.getElementById('auth-pw-open').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('auth-pw-create').addEventListener('keydown', e => { if (e.key === 'Enter') doCreate(); });
 
   loadEditions();
-  loadWatchlist();
+  initAuth();
+
+  /* ── Auth modal ── */
+  function switchAuthTab(tab) {
+    document.getElementById('tab-open').classList.toggle('hidden',   tab !== 'open');
+    document.getElementById('tab-create').classList.toggle('hidden', tab !== 'create');
+    document.querySelectorAll('.auth-tab').forEach((btn, i) => {
+      btn.classList.toggle('active', (i === 0 && tab === 'open') || (i === 1 && tab === 'create'));
+    });
+    document.getElementById('auth-err-open').textContent   = '';
+    document.getElementById('auth-err-create').textContent = '';
+  }
+
+  async function initAuth() {
+    const token = getToken();
+    updateAuthArea(!!token);
+    if (!token) return;
+    const res = await fetch('/api/watchlist', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (res.status === 401) { clearToken(); updateAuthArea(false); return; }
+    updateAuthArea(true);
+    renderWatchlist(await res.json());
+  }
+
+  function updateAuthArea(loggedIn) {
+    const area = document.getElementById('wl-auth-area');
+    if (loggedIn) {
+      area.innerHTML = `
+        <button class="btn-outline btn-sm" onclick="doLogout()">Odhlásit</button>
+        <button class="btn-danger btn-sm" onclick="deleteWatchlist()">🗑 Smazat watchlist</button>`;
+    } else {
+      area.innerHTML = `<button class="btn-outline" onclick="showAuthModal()">🔐 Přihlásit se k watchlistu</button>`;
+    }
+  }
+
+  function showAuthModal() { document.getElementById('auth-overlay').classList.remove('hidden'); }
+  function hideAuthModal() { document.getElementById('auth-overlay').classList.add('hidden'); }
+
+  async function doLogin() {
+    const pw  = document.getElementById('auth-pw-open').value;
+    const err = document.getElementById('auth-err-open');
+    err.textContent = '';
+    if (!pw) { err.textContent = 'Zadej heslo.'; return; }
+
+    const res  = await fetch('/api/watchlist/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ password: pw }) });
+    const data = await res.json();
+    if (!res.ok) { err.textContent = data.error; return; }
+
+    setToken(data.token);
+    document.getElementById('auth-pw-open').value = '';
+    hideAuthModal();
+    updateAuthArea(true);
+    await loadWatchlist();
+  }
+
+  async function doCreate() {
+    const pw  = document.getElementById('auth-pw-create').value;
+    const err = document.getElementById('auth-err-create');
+    err.textContent = '';
+    if (!pw) { err.textContent = 'Zadej heslo.'; return; }
+
+    const res  = await fetch('/api/watchlist/create', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ password: pw }) });
+    const data = await res.json();
+    if (!res.ok) { err.textContent = data.error; return; }
+
+    setToken(data.token);
+    document.getElementById('auth-pw-create').value = '';
+    hideAuthModal();
+    updateAuthArea(true);
+    await loadWatchlist();
+  }
+
+  function doLogout() {
+    clearToken();
+    updateAuthArea(false);
+    renderWatchlist([]);
+  }
+
+  async function deleteWatchlist() {
+    if (!confirm('Opravdu chceš smazat celý watchlist? Tato akce je nevratná.')) return;
+    const res = await fetch('/api/watchlist/all', { method: 'DELETE', headers: authHeaders() });
+    if (!res.ok) { alert('Chyba při mazání.'); return; }
+    clearToken();
+    updateAuthArea(false);
+    renderWatchlist([]);
+  }
 
   /* ── Editions dropdown ── */
   async function loadEditions() {
@@ -363,10 +616,7 @@
       const errNote = data.errors?.length ? ` (chyba: ${data.errors.join(', ')})` : '';
       info.textContent = `Nalezeno ${data.count} výsledků pro „${data.query}"${errNote}`;
 
-      if (data.count === 0) {
-        out.innerHTML = '<div class="empty">Žádné výsledky.</div>';
-        return;
-      }
+      if (data.count === 0) { out.innerHTML = '<div class="empty">Žádné výsledky.</div>'; return; }
 
       const rows = data.cards.map((c, i) => {
         const shopBadge = c.shop === 'Najáda'
@@ -404,9 +654,9 @@
 
   /* ── Watchlist load ── */
   async function loadWatchlist() {
-    const res  = await fetch('/api/watchlist');
-    const list = await res.json();
-    renderWatchlist(list);
+    const res = await fetch('/api/watchlist', { headers: authHeaders() });
+    if (res.status === 401) { clearToken(); showAuthModal(); return; }
+    renderWatchlist(await res.json());
   }
 
   /* ── Watchlist add ── */
@@ -415,22 +665,23 @@
     const edition = document.getElementById('wl-edition').value;
     if (!name || !edition) { alert('Zadej název karty a vyber edici.'); return; }
 
-    const res  = await fetch('/api/watchlist', {
+    const res = await fetch('/api/watchlist/add', {
       method : 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body   : JSON.stringify({ name, edition }),
     });
+    if (res.status === 401) { clearToken(); showAuthModal(); return; }
     const entry = await res.json();
     if (!res.ok) { alert(entry.error); return; }
 
-    document.getElementById('wl-name').value = '';
+    document.getElementById('wl-name').value    = '';
     document.getElementById('wl-edition').value = '';
     await loadWatchlist();
   }
 
-  /* ── Watchlist remove ── */
+  /* ── Watchlist remove card ── */
   async function removeFromWatchlist(id) {
-    await fetch('/api/watchlist/' + id, { method: 'DELETE' });
+    await fetch('/api/watchlist/' + id, { method: 'DELETE', headers: authHeaders() });
     await loadWatchlist();
   }
 
@@ -442,13 +693,12 @@
     btn.disabled    = true;
     btn.textContent = '↻ Aktualizuji…';
     info.textContent = 'Načítám ceny ze serveru…';
-
-    // Zobraz spinner v tabulce
-    const tbody = document.getElementById('wl-body');
-    tbody.innerHTML = '<tr class="spinner-row"><td colspan="8"><div class="spinner"></div></td></tr>';
+    document.getElementById('wl-body').innerHTML =
+      '<tr class="spinner-row"><td colspan="9"><div class="spinner"></div></td></tr>';
 
     try {
-      const res  = await fetch('/api/watchlist/refresh', { method: 'POST' });
+      const res  = await fetch('/api/watchlist/refresh', { method: 'POST', headers: authHeaders() });
+      if (res.status === 401) { clearToken(); showAuthModal(); return; }
       const list = await res.json();
       if (!res.ok) throw new Error(list.error);
       renderWatchlist(list);
@@ -462,44 +712,55 @@
     }
   }
 
-  /* ── Render watchlist table ── */
+  /* ── Render watchlist ── */
   function renderWatchlist(list) {
     const tbody = document.getElementById('wl-body');
-
     if (!list || list.length === 0) {
       tbody.innerHTML = '<tr><td colspan="9" class="empty">Watchlist je prázdný.</td></tr>';
       return;
     }
 
     tbody.innerHTML = list.map((e, i) => {
-      // CR – nový formát cr_price/cr_quantity, nebo starý price/quantity jako fallback
-      const crPrice = e.cr_price    ?? e.price    ?? null;
-      const crQty   = e.cr_quantity ?? e.quantity  ?? null;
-
-      const crPriceCell = crPrice !== null ? `<span class="col-price">${fmt(crPrice)}</span>` : '–';
-      const crQtyCell   = crQty   !== null ? `<span class="${qtyClass(crQty)}">${crQty} ks</span>` : '–';
-
-      // Najáda – všechny naskladněné kvality
-      const articles = e.najada_articles || [];
-      let njCell;
-      if (articles.length === 0) {
-        njCell = '<span style="color:var(--muted)">–</span>';
-      } else {
-        njCell = articles.map(a => {
-          const condTag = a.condition && a.condition !== '–'
-            ? `<span class="cond cond-${a.condition}">${esc(a.condition)}</span> `
-            : '';
-          const qtySpan = `<span class="${qtyClass(a.quantity)}">${a.quantity} ks</span>`;
-          return `<div style="white-space:nowrap">${condTag}<span class="col-price">${fmt(a.price)}</span> ${qtySpan}</div>`;
+      // ── CR articles (všechny varianty včetně lightly played apod.)
+      const crArticles = e.cr_articles && e.cr_articles.length > 0 ? e.cr_articles : null;
+      let crPriceCell, crQtyCell;
+      if (crArticles) {
+        crPriceCell = crArticles.map(a => {
+          // Zobraz suffix za base jménem (= stav) + cenu
+          const suffix = a.name.replace(new RegExp('^' + escRe(e.name), 'i'), '').trim().replace(/^-\s*/, '');
+          const label  = suffix ? `<span style="color:var(--muted);font-size:.8em">${esc(suffix)}</span> ` : '';
+          return `<div>${label}<span class="col-price">${fmt(a.price)}</span></div>`;
         }).join('');
+        crQtyCell = crArticles.map(a =>
+          `<div class="${qtyClass(a.quantity)}">${a.quantity} ks</div>`
+        ).join('');
+      } else if (e.cr_price !== null && e.cr_price !== undefined) {
+        // Fallback na staré jednotlivé pole
+        crPriceCell = `<span class="col-price">${fmt(e.cr_price)}</span>`;
+        crQtyCell   = `<span class="${qtyClass(e.cr_quantity ?? 0)}">${e.cr_quantity ?? 0} ks</span>`;
+      } else {
+        crPriceCell = '–';
+        crQtyCell   = '';
       }
 
-      const ts = e.lastUpdated
-        ? `<span class="ts">${new Date(e.lastUpdated).toLocaleString('cs-CZ', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}</span>`
-        : '<span class="ts">—</span>';
+      // ── Najáda articles
+      const articles = e.najada_articles || [];
+      let njCondCell, njPriceCell, njQtyCell;
+      if (articles.length === 0) {
+        njCondCell  = '<span style="color:var(--muted)">–</span>';
+        njPriceCell = '';
+        njQtyCell   = '';
+      } else {
+        njCondCell  = articles.map(a => {
+          const c = a.condition && a.condition !== '–' ? a.condition : '–';
+          return `<div><span class="cond cond-${c}">${esc(c)}</span></div>`;
+        }).join('');
+        njPriceCell = articles.map(a => `<div class="nj-price">${fmt(a.price)}</div>`).join('');
+        njQtyCell   = articles.map(a => `<div class="nj-qty ${qtyClass(a.quantity)}">${a.quantity} ks</div>`).join('');
+      }
 
-      const crInStock     = (e.cr_quantity ?? e.quantity ?? 0) > 0;
-      const najadaInStock = (e.najada_articles || []).some(a => a.quantity > 0);
+      const crInStock     = crArticles ? crArticles.some(a => a.quantity > 0) : (e.cr_quantity ?? 0) > 0;
+      const najadaInStock = articles.some(a => a.quantity > 0);
       const rowClass      = (crInStock || najadaInStock) ? ' class="in-stock"' : '';
 
       return `<tr${rowClass}>
@@ -508,24 +769,160 @@
         <td class="col-edition">${esc(e.edition)}</td>
         <td>${crPriceCell}</td>
         <td class="col-qty">${crQtyCell}</td>
-        <td>${njCell}</td>
-        <td>${ts}</td>
+        <td>${njCondCell}</td>
+        <td>${njPriceCell}</td>
+        <td class="col-qty">${njQtyCell}</td>
         <td class="col-action"><button class="btn-remove" title="Odebrat" onclick="removeFromWatchlist('${e.id}')">✕</button></td>
       </tr>`;
     }).join('');
   }
 
-  /* ── Helpers ── */
-  function qtyClass(q) {
-    return q === 0 ? 'qty-zero' : q <= 3 ? 'qty-low' : 'qty-ok';
+  /* ── Import modal ── */
+  const SET_CODE_MAP = {
+    'LEA':'Alpha','LEB':'Beta','2ED':'Unlimited','3ED':'3rd Edition','RVR':'3rd Edition',
+    '4ED':'Fourth Edition','5ED':'Fifth Edition','6ED':'Classic Sixth Edition','7ED':'Seventh Edition',
+    'ARN':'Arabian Nights','ATQ':'Antiquities','LEG':'Legends','DRK':'The Dark','FEM':'Fallen Empires',
+    'ICE':'Ice Age','CHR':'Chronicles','HML':'Homelands','ALL':'Alliances',
+    'MIR':'Mirage','VIS':'Visions','WTH':'Weatherlight',
+    'TMP':'Tempest','STH':'Stronghold','EXO':'Exodus',
+    'USG':"Urza's Saga",'ULG':"Urza's Legacy",'UDS':"Urza's Destiny",
+    'MMQ':'Mercadian Masques','NMS':'Nemesis','PCY':'Prophecy',
+    'INV':'Invasion','PLS':'Planeshift','APC':'Apocalypse',
+    'ODY':'Odyssey','TOR':'Torment','JUD':'Judgment',
+    'ONS':'Onslaught','LGN':'Legions','SCG':'Scourge',
+  };
+
+  let importParsed = [];
+
+  function showImportModal() {
+    const tok = getToken();
+    if (!tok) { alert('Nejprve se přihlas do watchlistu.'); return; }
+    document.getElementById('import-overlay').classList.remove('hidden');
+    document.getElementById('import-textarea').value = '';
+    document.getElementById('import-parse-info').textContent = '';
+    document.getElementById('import-preview').classList.add('hidden');
+    document.getElementById('import-preview').innerHTML = '';
+    document.getElementById('import-actions').classList.add('hidden');
+    importParsed = [];
   }
 
-  function fmt(n) {
-    return (n || 0).toLocaleString('cs-CZ') + ' Kč';
+  function hideImportModal() {
+    document.getElementById('import-overlay').classList.add('hidden');
   }
 
-  function esc(s) {
-    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  /* Scryfall – vrátí pole Pre-Modern edic pro danou kartu */
+  async function scryfallEditions(name) {
+    try {
+      const url  = `https://api.scryfall.com/cards/search?q=!"${encodeURIComponent(name)}"&unique=prints&order=released`;
+      const resp = await fetch(url);
+      if (!resp.ok) return [];
+      const data = await resp.json();
+      const editions = [];
+      for (const card of data.data || []) {
+        const ed = SET_CODE_MAP[(card.set || '').toUpperCase()];
+        if (ed && !editions.includes(ed)) editions.push(ed);
+      }
+      return editions;
+    } catch { return []; }
+  }
+
+  async function parseImport() {
+    const raw   = document.getElementById('import-textarea').value;
+    const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+    importParsed = [];
+    const info  = document.getElementById('import-parse-info');
+
+    for (const line of lines) {
+      const m = line.match(/^(?:\d+x?\s+)?(.+?)(?:\s+\(([^)]+)\))?(?:\s+\[.*?\])?\s*$/i);
+      if (!m) continue;
+      const rawName = (m[1] || '').trim();
+      const rawCode = (m[2] || '').trim().toUpperCase();
+      const edition = SET_CODE_MAP[rawCode] || (rawCode.length > 3 ? m[2]?.trim() : null);
+      importParsed.push({ name: rawName, code: rawCode, edition: edition || null, ok: !!edition, options: [] });
+    }
+
+    // Pro karty bez edice dotázat Scryfall
+    const missing = importParsed.filter(c => !c.ok);
+    if (missing.length > 0) {
+      info.textContent = `Hledám edice přes Scryfall (0 / ${missing.length})…`;
+      for (let i = 0; i < missing.length; i++) {
+        const card = missing[i];
+        info.textContent = `Hledám edice přes Scryfall (${i + 1} / ${missing.length})…`;
+        card.options = await scryfallEditions(card.name);
+        if (card.options.length === 1) {
+          card.edition = card.options[0];
+          card.ok      = true;
+          card.auto    = true;
+        } else if (card.options.length > 1) {
+          card.ok = true; // bude vybrána přes select
+        }
+        if (i < missing.length - 1) await new Promise(r => setTimeout(r, 120)); // rate limit
+      }
+    }
+
+    renderImportPreview();
+  }
+
+  function renderImportPreview() {
+    const ok   = importParsed.filter(c => c.ok).length;
+    const skip = importParsed.filter(c => !c.ok).length;
+    document.getElementById('import-parse-info').textContent =
+      `${ok} karet rozpoznáno${skip ? `, ${skip} nenalezeno v Pre-Modern` : ''}`;
+
+    const preview = document.getElementById('import-preview');
+    preview.classList.remove('hidden');
+    preview.innerHTML = `<table>
+      <thead><tr><th>Název</th><th>Edice</th><th>Status</th></tr></thead>
+      <tbody>${importParsed.map((c, idx) => {
+        let edCell, statusCell;
+        if (!c.ok) {
+          edCell     = '<span style="color:var(--muted)">–</span>';
+          statusCell = '<span class="import-warn">nenalezeno</span>';
+        } else if (c.options.length > 1) {
+          edCell     = `<select id="imp-sel-${idx}" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:.2rem .4rem;font-size:.8rem">
+            ${c.options.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('')}
+          </select>`;
+          statusCell = '<span class="import-warn">vyber edici</span>';
+        } else {
+          edCell     = `<span>${esc(c.edition)}</span>${c.auto ? ' <span style="font-size:.75em;color:var(--muted)">(auto)</span>' : ''}`;
+          statusCell = '<span class="import-ok">✓</span>';
+        }
+        return `<tr class="${c.ok ? '' : 'import-row-skip'}">
+          <td>${esc(c.name)}</td>
+          <td>${edCell}</td>
+          <td>${statusCell}</td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>`;
+
+    if (ok > 0) document.getElementById('import-actions').classList.remove('hidden');
+  }
+
+  async function confirmImport() {
+    // Přečíst aktuální výběry ze selectů
+    importParsed.forEach((c, idx) => {
+      if (c.ok && c.options.length > 1) {
+        const sel = document.getElementById(`imp-sel-${idx}`);
+        if (sel) c.edition = sel.value;
+      }
+    });
+
+    const cards = importParsed.filter(c => c.ok && c.edition).map(c => ({ name: c.name, edition: c.edition }));
+    if (!cards.length) return;
+    try {
+      const res  = await fetch('/api/watchlist/import', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ cards }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      hideImportModal();
+      renderWatchlist(data.list);
+      document.getElementById('wl-info').textContent = `Importováno ${data.added} karet`;
+    } catch (err) {
+      alert('Chyba při importu: ' + err.message);
+    }
   }
 </script>
 </body>

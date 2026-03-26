@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CR Search – Admin</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f0f17; --panel: #18182a; --row: #1e1e30; --row-alt: #22223a;
+      --border: #2e2e50; --glow: #5e4ec0; --text: #dcdcf0; --muted: #7878a8;
+      --green: #34d97b; --red: #f04f5e; --purple: #a060f0; --radius: 8px;
+    }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; padding: 2rem 1rem 4rem; gap: 2rem;
+    }
+    h1 { font-size: 1.4rem; font-weight: 700; color: var(--purple); }
+    input[type="password"] {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--radius); color: var(--text); font: inherit;
+      font-size: .95rem; padding: .55rem 1rem; outline: none; width: 100%;
+      transition: border-color .15s;
+    }
+    input[type="password"]:focus { border-color: var(--glow); }
+    input[type="password"]::placeholder { color: var(--muted); }
+    button {
+      background: var(--purple); border: none; border-radius: var(--radius);
+      color: #fff; font: inherit; font-size: .92rem; font-weight: 600;
+      padding: .55rem 1.2rem; cursor: pointer; transition: background .15s;
+    }
+    button:hover { background: #8040d8; }
+    button.btn-danger { background: #7a1020; font-size: .8rem; padding: .3rem .7rem; }
+    button.btn-danger:hover { background: var(--red); }
+    button.btn-logout {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--muted); font-size: .82rem; padding: .35rem .8rem;
+    }
+    button.btn-logout:hover { background: var(--border); color: var(--text); }
+    .login-box {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 12px; padding: 2rem; width: 100%; max-width: 360px;
+      display: flex; flex-direction: column; gap: 1rem;
+    }
+    .login-box h2 { font-size: 1rem; color: var(--muted); }
+    .error { font-size: .82rem; color: var(--red); min-height: 1.1em; }
+    .section { width: 100%; max-width: 800px; }
+    .section-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: .8rem;
+    }
+    .section-title {
+      font-size: .78rem; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--muted);
+    }
+    .stats { font-size: .82rem; color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; background: var(--panel); border-radius: var(--radius); overflow: hidden; }
+    thead th {
+      padding: .65rem 1rem; text-align: left; font-size: .75rem;
+      font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+      color: var(--muted); border-bottom: 1px solid var(--border);
+    }
+    tbody tr:nth-child(odd)  { background: var(--row); }
+    tbody tr:nth-child(even) { background: var(--row-alt); }
+    tbody tr:hover { background: #28284a; }
+    tbody td { padding: .6rem 1rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tbody tr:last-child td { border-bottom: none; }
+    .mono { font-family: monospace; font-size: .8rem; color: var(--muted); }
+    .empty { color: var(--muted); padding: 1.5rem 1rem; font-size: .9rem; text-align: center; }
+  </style>
+</head>
+<body>
+
+<h1>🔧 Admin panel</h1>
+
+<!-- Login -->
+<div class="login-box" id="login-box">
+  <h2>Přihlášení admina</h2>
+  <input type="password" id="admin-pw" placeholder="Admin heslo" autocomplete="current-password" />
+  <button onclick="doAdminLogin()">Přihlásit</button>
+  <div class="error" id="login-err"></div>
+</div>
+
+<!-- Dashboard -->
+<div class="section" id="dashboard" style="display:none">
+  <div class="section-header">
+    <div>
+      <div class="section-title">Watchlisty</div>
+      <div class="stats" id="stats"></div>
+    </div>
+    <div style="display:flex;gap:.5rem;align-items:center">
+      <button onclick="loadWatchlists()" style="font-size:.82rem;padding:.35rem .8rem">↻ Obnovit</button>
+      <button class="btn-logout" onclick="doLogout()">Odhlásit</button>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>ID (hash)</th>
+        <th>Vytvořeno</th>
+        <th>Poslední přístup</th>
+        <th>Karet</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="wl-body">
+      <tr><td colspan="6" class="empty">Načítám…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+  const ADMIN_TOKEN_KEY = 'cr_admin_token';
+
+  function getToken()   { return sessionStorage.getItem(ADMIN_TOKEN_KEY); }
+  function setToken(t)  { sessionStorage.setItem(ADMIN_TOKEN_KEY, t); }
+  function clearToken() { sessionStorage.removeItem(ADMIN_TOKEN_KEY); }
+  function authHdr()    { return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() }; }
+
+  function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function fmtDate(s) {
+    if (!s) return '–';
+    return new Date(s).toLocaleString('cs-CZ', { dateStyle: 'short', timeStyle: 'short' });
+  }
+
+  document.getElementById('admin-pw').addEventListener('keydown', e => { if (e.key === 'Enter') doAdminLogin(); });
+
+  // Auto-login if token exists
+  if (getToken()) showDashboard();
+
+  async function doAdminLogin() {
+    const pw  = document.getElementById('admin-pw').value;
+    const err = document.getElementById('login-err');
+    err.textContent = '';
+    if (!pw) { err.textContent = 'Zadej heslo.'; return; }
+
+    const res  = await fetch('/api/admin/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ password: pw }) });
+    const data = await res.json();
+    if (!res.ok) { err.textContent = data.error; return; }
+
+    setToken(data.token);
+    showDashboard();
+  }
+
+  function doLogout() {
+    clearToken();
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('login-box').style.display = 'flex';
+    document.getElementById('admin-pw').value = '';
+  }
+
+  function showDashboard() {
+    document.getElementById('login-box').style.display  = 'none';
+    document.getElementById('dashboard').style.display  = 'block';
+    loadWatchlists();
+  }
+
+  async function loadWatchlists() {
+    const res = await fetch('/api/admin/watchlists', { headers: authHdr() });
+    if (res.status === 401) { doLogout(); return; }
+    const list = await res.json();
+
+    document.getElementById('stats').textContent = `Celkem watchlistů: ${list.length}`;
+
+    const tbody = document.getElementById('wl-body');
+    if (list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">Žádné watchlisty.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = list.map((w, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td class="mono">${esc(w.id)}</td>
+        <td>${fmtDate(w.created_at)}</td>
+        <td>${fmtDate(w.last_accessed)}</td>
+        <td>${w.card_count}</td>
+        <td><button class="btn-danger" onclick="deleteWatchlist('${esc(w.id)}', this)">Smazat</button></td>
+      </tr>
+    `).join('');
+  }
+
+  async function deleteWatchlist(id, btn) {
+    if (!confirm(`Smazat watchlist ${id}?`)) return;
+    btn.disabled = true;
+    const res = await fetch('/api/admin/watchlists/' + id, { method: 'DELETE', headers: authHdr() });
+    if (!res.ok) { alert('Chyba při mazání.'); btn.disabled = false; return; }
+    await loadWatchlists();
+  }
+</script>
+</body>
+</html>

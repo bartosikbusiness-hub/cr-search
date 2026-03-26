@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "cr-search",
-      "runtimeExecutable": "cmd",
-      "runtimeArgs": ["/c", "node server.js"],
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["server.js"],
       "port": 3000
     }
   ]

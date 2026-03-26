@@ -1,24 +1,135 @@
 'use strict';
 
+require('dotenv').config();
+
 const express      = require('express');
 const path         = require('path');
+const crypto       = require('crypto');
 const fs           = require('fs');
 const { chromium } = require('playwright');
+const bcrypt       = require('bcryptjs');
+const jwt          = require('jsonwebtoken');
+const Database     = require('better-sqlite3');
 
 const app  = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 const USER_AGENT     = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36';
+const JWT_SECRET     = process.env.JWT_SECRET     || 'dev-secret-cr-search';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const MAX_WATCHLISTS = parseInt(process.env.MAX_WATCHLISTS || '100', 10);
 const DATA_DIR       = path.join(__dirname, 'data');
-const WATCHLIST_FILE = path.join(DATA_DIR, 'watchlist.json');
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-/* ─── Pre-Modern legální edice (Fourth Edition – Scourge, 1995–2003) ──────── */
+/* ─── SQLite DB ──────────────────────────────────────────────────────────── */
+
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+
+const db = new Database(path.join(DATA_DIR, 'cr-search.db'));
+db.pragma('foreign_keys = ON');
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS watchlists (
+    id            TEXT PRIMARY KEY,
+    password_hash TEXT NOT NULL,
+    created_at    TEXT DEFAULT (datetime('now')),
+    last_accessed TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS watchlist_cards (
+    id              TEXT PRIMARY KEY,
+    watchlist_id    TEXT NOT NULL,
+    name            TEXT NOT NULL,
+    edition         TEXT NOT NULL,
+    cr_price        REAL,
+    cr_quantity     INTEGER,
+    cr_articles     TEXT,
+    najada_articles TEXT,
+    last_updated    TEXT,
+    FOREIGN KEY (watchlist_id) REFERENCES watchlists(id) ON DELETE CASCADE
+  );
+`);
+
+// Migrace – přidej cr_articles sloupec pokud chybí (starší DB)
+try { db.exec('ALTER TABLE watchlist_cards ADD COLUMN cr_articles TEXT'); } catch { /* sloupec již existuje */ }
+
+/* ─── Migrace starého watchlist.json → SQLite ────────────────────────────── */
+
+const OLD_WATCHLIST_FILE = path.join(DATA_DIR, 'watchlist.json');
+const MIGRATION_PASSWORD = 'import1234';
+
+async function migrateOldWatchlist() {
+  if (!fs.existsSync(OLD_WATCHLIST_FILE)) return;
+  const raw = fs.readFileSync(OLD_WATCHLIST_FILE, 'utf8');
+  let cards;
+  try { cards = JSON.parse(raw); } catch { return; }
+  if (!Array.isArray(cards) || cards.length === 0) return;
+
+  const migId = crypto.createHash('sha256').update(MIGRATION_PASSWORD).digest('hex').slice(0, 32);
+  if (db.prepare('SELECT id FROM watchlists WHERE id = ?').get(migId)) return; // už migrováno
+
+  const hash = await bcrypt.hash(MIGRATION_PASSWORD, 10);
+  db.prepare('INSERT INTO watchlists (id, password_hash) VALUES (?, ?)').run(migId, hash);
+
+  const insert = db.prepare('INSERT INTO watchlist_cards (id, watchlist_id, name, edition, cr_price, cr_quantity, najada_articles, last_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+  for (const c of cards) {
+    insert.run(
+      c.id || (Date.now().toString(36) + Math.random().toString(36).slice(2, 6)),
+      migId,
+      c.name,
+      c.edition,
+      c.cr_price ?? c.price ?? null,
+      c.cr_quantity ?? c.quantity ?? null,
+      c.najada_articles ? JSON.stringify(c.najada_articles) : '[]',
+      c.lastUpdated || null
+    );
+  }
+
+  fs.renameSync(OLD_WATCHLIST_FILE, OLD_WATCHLIST_FILE + '.bak');
+  console.log(`\n📦  Migrace watchlistu: ${cards.length} karet importováno.`);
+  console.log(`    Heslo pro přístup: "${MIGRATION_PASSWORD}"\n`);
+}
+
+/* ─── Auth helpers ───────────────────────────────────────────────────────── */
+
+function passwordToId(password) {
+  return crypto.createHash('sha256').update(password).digest('hex').slice(0, 32);
+}
+
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function requireWatchlist(req, res, next) {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET);
+    if (payload.role !== 'watchlist') return res.status(403).json({ error: 'Forbidden' });
+    req.watchlistId = payload.watchlistId;
+    next();
+  } catch {
+    res.status(401).json({ error: 'Neplatný nebo expirovaný token' });
+  }
+}
+
+function requireAdmin(req, res, next) {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET);
+    if (payload.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+    next();
+  } catch {
+    res.status(401).json({ error: 'Neplatný nebo expirovaný token' });
+  }
+}
+
+/* ─── Pre-Modern legální edice ───────────────────────────────────────────── */
 
 const PREMODERN_EDITIONS = [
-  // Staré sady (pre-4th)
   'Arabian Nights',
   'Antiquities',
   'Legends', 'Legends Italian', 'Italian Legends', 'Leggende',
@@ -30,76 +141,32 @@ const PREMODERN_EDITIONS = [
   '3rd Edition', 'Revised Edition', 'Revised',
   'Asian Black Bordered', 'Asian BB',
   'Foreign Black Bordered', 'FBB',
-  // Základní sady
   '4th Edition', 'Fourth Edition',
   '5th Edition', 'Fifth Edition',
   '6th Edition', 'Sixth Edition', 'Classic Sixth',
   '7th Edition', 'Seventh Edition',
-  // Ice Age blok
   'Ice Age', 'Chronicles', 'Homelands', 'Alliances',
-  // Mirage blok
   'Mirage', 'Visions', 'Weatherlight',
-  // Tempest blok
   'Tempest', 'Stronghold', 'Exodus',
-  // Urza blok
   "Urza's Saga", "Urza's Legacy", "Urza's Destiny",
-  // Masques blok
   'Mercadian Masques', 'Nemesis', 'Prophecy',
-  // Invasion blok
   'Invasion', 'Planeshift', 'Apocalypse',
-  // Odyssey blok
   'Odyssey', 'Torment', 'Judgment',
-  // Onslaught blok
   'Onslaught', 'Legions', 'Scourge',
 ];
 
-// Zobrazitelné názvy edicí pro frontend dropdown (abecedně)
 const EDITION_LABELS = [
-  '3rd Edition',
-  'Alliances',
-  'Alpha',
-  'Antiquities',
-  'Apocalypse',
-  'Arabian Nights',
-  'Asian Black Bordered',
-  'Beta',
-  'Chronicles',
-  'Classic Sixth Edition',
-  'Exodus',
-  'Fallen Empires',
-  'Fifth Edition',
-  'Foreign Black Bordered',
-  'Fourth Edition',
-  'Homelands',
-  'Ice Age',
-  'Invasion',
-  'Judgment',
-  'Legends',
-  'Legends Italian',
-  'Legions',
-  'Mercadian Masques',
-  'Mirage',
-  'Nemesis',
-  'Odyssey',
-  'Onslaught',
-  'Planeshift',
-  'Prophecy',
-  'Revised',
-  'Scourge',
-  'Seventh Edition',
-  'Stronghold',
-  'Tempest',
-  'The Dark',
-  'Torment',
-  'Unlimited',
-  "Urza's Destiny",
-  "Urza's Legacy",
-  "Urza's Saga",
-  'Visions',
-  'Weatherlight',
+  '3rd Edition', 'Alliances', 'Alpha', 'Antiquities', 'Apocalypse',
+  'Arabian Nights', 'Asian Black Bordered', 'Beta', 'Chronicles',
+  'Classic Sixth Edition', 'Exodus', 'Fallen Empires', 'Fifth Edition',
+  'Foreign Black Bordered', 'Fourth Edition', 'Homelands', 'Ice Age',
+  'Invasion', 'Judgment', 'Legends', 'Legends Italian', 'Legions',
+  'Mercadian Masques', 'Mirage', 'Nemesis', 'Odyssey', 'Onslaught',
+  'Planeshift', 'Prophecy', 'Revised', 'Scourge', 'Seventh Edition',
+  'Stronghold', 'Tempest', 'The Dark', 'Torment', 'Unlimited',
+  "Urza's Destiny", "Urza's Legacy", "Urza's Saga", 'Visions', 'Weatherlight',
 ];
 
-// Normalizuje různé varianty apostrofu na standardní '
 function normalizeApos(s) {
   return (s || '').replace(/[\u00B4\u2018\u2019\u02BC`]/g, "'");
 }
@@ -108,26 +175,11 @@ function isPremodern(edition) {
   const e = normalizeApos(edition).toLowerCase().trim();
   return PREMODERN_EDITIONS.some(pat => {
     const p = normalizeApos(pat).toLowerCase().trim();
-    // Exact match nebo edition začíná vzorem (následovaným non-word znakem nebo koncem)
     return e === p || (e.startsWith(p) && (e.length === p.length || /\W/.test(e[p.length])));
   });
 }
 
-/* ─── Watchlist persistence ──────────────────────────────────────────────── */
-
-function loadWatchlist() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-  if (!fs.existsSync(WATCHLIST_FILE)) return [];
-  try { return JSON.parse(fs.readFileSync(WATCHLIST_FILE, 'utf8')); }
-  catch { return []; }
-}
-
-function saveWatchlist(list) {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(WATCHLIST_FILE, JSON.stringify(list, null, 2), 'utf8');
-}
-
-/* ─── Sdílená extrakce karet z jedné stránky ─────────────────────────────── */
+/* ─── CR scraper ─────────────────────────────────────────────────────────── */
 
 function extractCardsFromPage(page) {
   return page.evaluate(() => {
@@ -177,8 +229,6 @@ function extractCardsFromPage(page) {
   });
 }
 
-/* ─── Vyhledání všech stránek pro daný dotaz ─────────────────────────────── */
-
 async function searchAllPages(page, q) {
   const PAGE_SIZE = 30;
   const firstUrl  = `https://www.cernyrytir.cz/index.php3?akce=3&jmenokarty=${encodeURIComponent(q)}&edice_magic=0&submit=Vyhledej`;
@@ -212,7 +262,7 @@ async function searchAllPages(page, q) {
   return allCards;
 }
 
-/* ─── Najada API search ──────────────────────────────────────────────────── */
+/* ─── Najada API ─────────────────────────────────────────────────────────── */
 
 const NAJADA_GAME_ID = '40e972fe-c136-4d66-b61a-89f6be0f93d5';
 
@@ -222,11 +272,7 @@ async function searchNajada(query) {
     `&q=${encodeURIComponent(query)}&article_price_min=0&article_price_max=10000000&limit=200&offset=0`;
 
   const resp = await fetch(url, {
-    headers: {
-      'User-Agent': USER_AGENT,
-      'Accept'    : 'application/json',
-      'Referer'   : 'https://www.najada.games/',
-    },
+    headers: { 'User-Agent': USER_AGENT, 'Accept': 'application/json', 'Referer': 'https://www.najada.games/' },
   });
 
   if (!resp.ok) throw new Error(`Najada API vrátila ${resp.status}`);
@@ -270,18 +316,14 @@ app.get('/api/search', async (req, res) => {
         const ctx  = await browser.newContext({ userAgent: USER_AGENT });
         const page = await ctx.newPage();
         const all  = await searchAllPages(page, q);
-        return all
-          .filter(c => isPremodern(c.edition))
-          .map(c => ({ ...c, condition: '–', shop: 'Černý Rytíř' }));
+        return all.filter(c => isPremodern(c.edition)).map(c => ({ ...c, condition: '–', shop: 'Černý Rytíř' }));
       } finally {
         if (browser) await browser.close();
       }
     })());
   }
 
-  if (shops.includes('najada')) {
-    tasks.push(searchNajada(q));
-  }
+  if (shops.includes('najada')) tasks.push(searchNajada(q));
 
   const settled = await Promise.allSettled(tasks);
   const cards   = [];
@@ -296,109 +338,198 @@ app.get('/api/search', async (req, res) => {
   res.json({ query: q, count: cards.length, cards, errors });
 });
 
-/* ─── Editions endpoint (pro frontend dropdown) ──────────────────────────── */
+app.get('/api/editions', (_req, res) => res.json(EDITION_LABELS));
 
-app.get('/api/editions', (_req, res) => {
-  res.json(EDITION_LABELS);
+/* ─── Watchlist auth endpoints ───────────────────────────────────────────── */
+
+app.post('/api/watchlist/create', async (req, res) => {
+  const { password } = req.body || {};
+  if (!password || password.length < 4) return res.status(400).json({ error: 'Heslo musí mít alespoň 4 znaky' });
+
+  const count = db.prepare('SELECT COUNT(*) as c FROM watchlists').get().c;
+  if (count >= MAX_WATCHLISTS) return res.status(429).json({ error: `Maximální počet watchlistů (${MAX_WATCHLISTS}) byl dosažen` });
+
+  const id       = passwordToId(password);
+  const existing = db.prepare('SELECT id FROM watchlists WHERE id = ?').get(id);
+  if (existing) return res.status(409).json({ error: 'Watchlist s tímto heslem již existuje – použij "Otevřít existující".' });
+
+  const hash = await bcrypt.hash(password, 10);
+  db.prepare('INSERT INTO watchlists (id, password_hash) VALUES (?, ?)').run(id, hash);
+
+  const token = jwt.sign({ watchlistId: id, role: 'watchlist' }, JWT_SECRET, { expiresIn: '30d' });
+  res.json({ token });
 });
 
-/* ─── Watchlist endpoints ────────────────────────────────────────────────── */
+app.post('/api/watchlist/login', async (req, res) => {
+  const { password } = req.body || {};
+  if (!password) return res.status(400).json({ error: 'Chybí heslo' });
 
-app.get('/api/watchlist', (_req, res) => {
-  res.json(loadWatchlist());
+  const id = passwordToId(password);
+  const wl = db.prepare('SELECT * FROM watchlists WHERE id = ?').get(id);
+  if (!wl) return res.status(401).json({ error: 'Watchlist nenalezen – zkontroluj heslo nebo vytvoř nový.' });
+
+  const match = await bcrypt.compare(password, wl.password_hash);
+  if (!match) return res.status(401).json({ error: 'Watchlist nenalezen – zkontroluj heslo nebo vytvoř nový.' });
+
+  db.prepare("UPDATE watchlists SET last_accessed = datetime('now') WHERE id = ?").run(id);
+  const token = jwt.sign({ watchlistId: id, role: 'watchlist' }, JWT_SECRET, { expiresIn: '30d' });
+  res.json({ token });
 });
 
-app.post('/api/watchlist', (req, res) => {
+/* ─── Watchlist CRUD (protected) ─────────────────────────────────────────── */
+
+function dbCardsToList(rows) {
+  return rows.map(r => ({
+    ...r,
+    cr_articles    : r.cr_articles     ? JSON.parse(r.cr_articles)     : [],
+    najada_articles: r.najada_articles ? JSON.parse(r.najada_articles) : [],
+  }));
+}
+
+app.get('/api/watchlist', requireWatchlist, (req, res) => {
+  res.json(dbCardsToList(
+    db.prepare('SELECT * FROM watchlist_cards WHERE watchlist_id = ? ORDER BY rowid').all(req.watchlistId)
+  ));
+});
+
+app.post('/api/watchlist/add', requireWatchlist, (req, res) => {
   const { name, edition } = req.body || {};
   if (!name || !edition) return res.status(400).json({ error: 'Chybí name nebo edition' });
-
-  const list  = loadWatchlist();
-  const entry = {
-    id       : Date.now().toString(),
-    name     : name.trim(),
-    edition  : edition.trim(),
-    price    : null,
-    quantity : null,
-    lastUpdated: null,
-  };
-  list.push(entry);
-  saveWatchlist(list);
-  res.json(entry);
+  const id = genId();
+  db.prepare('INSERT INTO watchlist_cards (id, watchlist_id, name, edition) VALUES (?, ?, ?, ?)').run(id, req.watchlistId, name.trim(), edition.trim());
+  res.json({ id, watchlist_id: req.watchlistId, name: name.trim(), edition: edition.trim(), cr_price: null, cr_quantity: null, najada_articles: [] });
 });
 
-app.delete('/api/watchlist/:id', (req, res) => {
-  const list = loadWatchlist().filter(e => e.id !== req.params.id);
-  saveWatchlist(list);
+app.post('/api/watchlist/import', requireWatchlist, (req, res) => {
+  const { cards } = req.body || {};
+  if (!Array.isArray(cards) || cards.length === 0)
+    return res.status(400).json({ error: 'Chybí cards' });
+
+  const insert = db.prepare('INSERT INTO watchlist_cards (id, watchlist_id, name, edition) VALUES (?, ?, ?, ?)');
+  let added = 0;
+  for (const card of cards) {
+    const { name, edition } = card;
+    if (!name || !edition) continue;
+    try { insert.run(genId(), req.watchlistId, name.trim(), edition.trim()); added++; }
+    catch (e) { console.error('Import skip:', e.message); }
+  }
+
+  res.json({
+    added,
+    list: dbCardsToList(db.prepare('SELECT * FROM watchlist_cards WHERE watchlist_id = ? ORDER BY rowid').all(req.watchlistId))
+  });
+});
+
+app.delete('/api/watchlist/all', requireWatchlist, (req, res) => {
+  db.prepare('DELETE FROM watchlist_cards WHERE watchlist_id = ?').run(req.watchlistId);
+  db.prepare('DELETE FROM watchlists WHERE id = ?').run(req.watchlistId);
   res.json({ ok: true });
 });
 
-app.post('/api/watchlist/refresh', async (req, res) => {
-  const list = loadWatchlist();
-  if (list.length === 0) return res.json([]);
+app.delete('/api/watchlist/:id', requireWatchlist, (req, res) => {
+  db.prepare('DELETE FROM watchlist_cards WHERE id = ? AND watchlist_id = ?').run(req.params.id, req.watchlistId);
+  res.json({ ok: true });
+});
 
-  // Najada – všechny karty paralelně přes API
-  const najadaSettled = await Promise.allSettled(
-    list.map(entry => searchNajada(entry.name))
-  );
+app.post('/api/watchlist/refresh', requireWatchlist, async (req, res) => {
+  const rows = db.prepare('SELECT * FROM watchlist_cards WHERE watchlist_id = ?').all(req.watchlistId);
+  if (rows.length === 0) return res.json([]);
 
-  // CR – sekvenčně přes jeden Playwright browser
+  const najadaSettled = await Promise.allSettled(rows.map(r => searchNajada(r.name)));
+
   let browser;
   try {
     browser = await chromium.launch({ headless: true });
-    const ctx  = await browser.newContext({ userAgent: USER_AGENT });
-    const page = await ctx.newPage();
+    const ctx        = await browser.newContext({ userAgent: USER_AGENT });
+    const page       = await ctx.newPage();
+    const updateCard = db.prepare(
+      'UPDATE watchlist_cards SET cr_price=?, cr_quantity=?, cr_articles=?, najada_articles=?, last_updated=? WHERE id=?'
+    );
 
-    for (let i = 0; i < list.length; i++) {
-      const entry   = list[i];
-      const entryEd = normalizeApos(entry.edition).toLowerCase();
+    for (let i = 0; i < rows.length; i++) {
+      const row      = rows[i];
+      const entryEd  = normalizeApos(row.edition).toLowerCase();
+      const baseName = normalizeApos(row.name).toLowerCase().trim();
 
-      function editionMatch(c) {
+      const edMatch = c => {
         const cardEd = normalizeApos(c.edition).toLowerCase();
         return cardEd.includes(entryEd) || entryEd.includes(cardEd);
-      }
+      };
 
-      // CR
+      // CR název musí začínat na baseName a hned za ním být konec nebo mezera/pomlčka
+      const nameMatch = c => {
+        const cn = normalizeApos(c.name).toLowerCase();
+        return cn.startsWith(baseName) &&
+          (cn.length === baseName.length || /[\s\-]/.test(cn[baseName.length]));
+      };
+
+      let cr_price = null, cr_quantity = null, cr_articles = [];
       try {
-        const crAll   = await searchAllPages(page, entry.name);
-        const crMatch = crAll.find(editionMatch) || null;
-        entry.cr_price    = crMatch ? crMatch.price    : null;
-        entry.cr_quantity = crMatch ? crMatch.quantity : null;
+        const crAll     = await searchAllPages(page, row.name);
+        const crMatched = crAll.filter(c => nameMatch(c) && edMatch(c))
+                               .sort((a, b) => a.price - b.price);
+        cr_articles = crMatched.map(a => ({ name: a.name, price: a.price, quantity: a.quantity }));
+        // Backward compat – ulož i best (první in-stock nebo nejlevnější)
+        const best  = crMatched.find(c => c.quantity > 0) || crMatched[0] || null;
+        cr_price    = best ? best.price    : null;
+        cr_quantity = best ? best.quantity : null;
       } catch (e) {
-        console.error(`[watchlist/refresh] CR chyba pro "${entry.name}":`, e.message);
-        entry.cr_price    = null;
-        entry.cr_quantity = null;
+        console.error(`[refresh] CR chyba pro "${row.name}":`, e.message);
       }
 
-      // Najáda – ulož VŠECHNY naskladněné kvality, seřazené od nejlevnější
+      let najada_articles = [];
       if (najadaSettled[i].status === 'fulfilled') {
-        const cards   = najadaSettled[i].value.filter(editionMatch);
-        const inStock = cards.filter(c => c.quantity > 0).sort((a, b) => a.price - b.price);
-        // Pokud nic není skladem, ulož referenční cenu (nejlevnější)
+        const cards    = najadaSettled[i].value.filter(edMatch);
+        const inStock  = cards.filter(c => c.quantity > 0).sort((a, b) => a.price - b.price);
         const fallback = !inStock.length ? cards.sort((a, b) => a.price - b.price).slice(0, 1) : [];
-        entry.najada_articles = (inStock.length ? inStock : fallback).map(a => ({
-          price    : a.price,
-          quantity : a.quantity,
-          condition: a.condition,
+        najada_articles = (inStock.length ? inStock : fallback).map(a => ({
+          price: a.price, quantity: a.quantity, condition: a.condition,
         }));
-      } else {
-        entry.najada_articles = [];
       }
 
-      entry.lastUpdated = new Date().toISOString();
+      updateCard.run(cr_price, cr_quantity, JSON.stringify(cr_articles), JSON.stringify(najada_articles), new Date().toISOString(), row.id);
     }
 
-    saveWatchlist(list);
-    res.json(list);
+    res.json(dbCardsToList(
+      db.prepare('SELECT * FROM watchlist_cards WHERE watchlist_id = ? ORDER BY rowid').all(req.watchlistId)
+    ));
   } catch (err) {
-    console.error('[watchlist/refresh] Chyba:', err.message);
+    console.error('[refresh] Chyba:', err.message);
     res.status(500).json({ error: err.message });
   } finally {
     if (browser) await browser.close();
   }
 });
 
+/* ─── Admin endpoints ────────────────────────────────────────────────────── */
+
+app.post('/api/admin/login', (req, res) => {
+  const { password } = req.body || {};
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Nesprávné heslo' });
+  const token = jwt.sign({ role: 'admin' }, JWT_SECRET, { expiresIn: '8h' });
+  res.json({ token });
+});
+
+app.get('/api/admin/watchlists', requireAdmin, (_req, res) => {
+  res.json(db.prepare(`
+    SELECT w.id, w.created_at, w.last_accessed, COUNT(c.id) as card_count
+    FROM watchlists w
+    LEFT JOIN watchlist_cards c ON c.watchlist_id = w.id
+    GROUP BY w.id ORDER BY w.created_at DESC
+  `).all());
+});
+
+app.delete('/api/admin/watchlists/:id', requireAdmin, (req, res) => {
+  db.prepare('DELETE FROM watchlist_cards WHERE watchlist_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM watchlists WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
 /* ─── Start ──────────────────────────────────────────────────────────────── */
 
-app.listen(PORT, () => {
-  console.log(`\n🔍  CR Search  →  http://localhost:${PORT}\n`);
+migrateOldWatchlist().then(() => {
+  app.listen(PORT, () => {
+    console.log(`\n🔍  CR Search  →  http://localhost:${PORT}`);
+    console.log(`🔧  Admin      →  http://localhost:${PORT}/admin.html\n`);
+  });
 });
