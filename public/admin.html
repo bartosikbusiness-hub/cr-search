@@ -100,6 +100,7 @@
     <thead>
       <tr>
         <th>#</th>
+        <th>Heslo</th>
         <th>ID (hash)</th>
         <th>Vytvořeno</th>
         <th>Poslední přístup</th>
@@ -176,6 +177,7 @@
     tbody.innerHTML = list.map((w, i) => `
       <tr>
         <td>${i + 1}</td>
+        <td><strong>${esc(w.password_plain) || '<span style="color:var(--muted)">–</span>'}</strong></td>
         <td class="mono">${esc(w.id)}</td>
         <td>${fmtDate(w.created_at)}</td>
         <td>${fmtDate(w.last_accessed)}</td>

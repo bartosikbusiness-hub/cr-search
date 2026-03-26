@@ -43,7 +43,10 @@ app.get('/api/changelog', (_req, res) => res.json(CHANGELOG));
 
 const KNOWN_ISSUES = [
   { id: 1, severity: 'low',    desc: 'Checkbox v multi-edition pickeru má příliš velkou mezeru od textu edice – kosmetický problém, funkčnost není dotčena' },
-  { id: 2, severity: 'info',   desc: 'Integrace shopu Dobi (Cardmarket / Dobi-trading-DE) čeká na otevření Cardmarket API – momentálně nepřijímají nové žádosti o přístup. Implementace proběhne jakmile API bude dostupné.' },
+  { id: 2, severity: 'info',   desc: 'Integrace shopu Dobi (Cardmarket / Dobi-trading-DE) čeká na otevření Cardmarket API – momentálně nepřijímají nové žádosti o přístup, implementace proběhne jakmile API bude dostupné' },
+  { id: 3, severity: 'medium', desc: 'Watchlist refresh pro karty s krátkým názvem (např. "Island") může vrátit i karty jejichž název začíná stejným slovem (např. "Island Fish Jasconius" z Arabian Nights), protože CR embedduje stav do názvu ve formátu "Karta - lightly played" a matching probíhá prefixem.' },
+  { id: 4, severity: 'info',   desc: 'bcrypt.compare() při loginu je redundantní – watchlist ID je deterministicky odvozeno ze SHA-256 hesla, takže samotný lookup podle ID již ověřuje znalost hesla. bcryptjs závislost lze odstranit.' },
+  { id: 5, severity: 'info',   desc: 'Playwright package obsahuje bindings pro Chromium, Firefox i WebKit, ale používá se pouze Chromium. Při nasazení nahradit za playwright-core + standalone Chromium (~280 MB místo ~900 MB).' },
 ];
 
 app.get('/api/known-issues', (_req, res) => res.json(KNOWN_ISSUES));
@@ -59,6 +62,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS watchlists (
     id            TEXT PRIMARY KEY,
     password_hash TEXT NOT NULL,
+    password_plain TEXT,
     created_at    TEXT DEFAULT (datetime('now')),
     last_accessed TEXT
   );
@@ -79,6 +83,7 @@ db.exec(`
 
 // Migrace – přidej cr_articles sloupec pokud chybí (starší DB)
 try { db.exec('ALTER TABLE watchlist_cards ADD COLUMN cr_articles TEXT'); } catch { /* sloupec již existuje */ }
+try { db.exec('ALTER TABLE watchlists ADD COLUMN password_plain TEXT'); } catch { /* sloupec již existuje */ }
 
 /* ─── Migrace starého watchlist.json → SQLite ────────────────────────────── */
 
@@ -211,52 +216,62 @@ function extractCardsFromPage(page) {
     const allRows = Array.from(document.querySelectorAll('tr'));
     const cards   = [];
 
-    for (let i = 0; i < allRows.length; i++) {
-      const cellsC = Array.from(allRows[i].querySelectorAll('td'));
-      if (cellsC.length !== 4) continue;
+    // New CR structure (2026):
+    //   row A (3 cells): card name in cells[1]
+    //   row B (2 cells): edition in cells[0], card type in cells[1]
+    //   row C (4 cells): rarity in cells[0], qty in cells[1], price in cells[2]
+    let pendingName    = null;
+    let currentName    = '';
+    let currentEdition = '–';
 
+    for (let i = 0; i < allRows.length; i++) {
+      const cells = Array.from(allRows[i].querySelectorAll('td'));
+
+      // Row A – card name
+      if (cells.length === 3) {
+        const t = (cells[1].innerText || '').replace(/\s+/g, ' ').trim();
+        if (t && t.length > 1 && t.length <= 100) pendingName = t;
+        continue;
+      }
+
+      // Row B – edition (only valid when following a name row)
+      if (cells.length === 2 && pendingName !== null) {
+        const ed = (cells[0].innerText || '').replace(/\s+/g, ' ').trim();
+        if (ed && ed.length > 1 && ed.length <= 80) {
+          currentName    = pendingName;
+          currentEdition = ed;
+        }
+        pendingName = null;
+        continue;
+      }
+
+      // Any non-2-cell row resets pendingName
+      if (cells.length !== 2) pendingName = null;
+
+      // Row C – price / qty
+      if (cells.length !== 4) continue;
       const rowText = allRows[i].innerText || '';
       if (!rowText.includes('Kč') || !rowText.includes('ks')) continue;
 
-      const priceM = (cellsC[2].innerText || '').match(/([\d\s]+)\s*Kč/);
+      const priceM = (cells[2].innerText || '').match(/([\d\s]+)\s*Kč/);
       if (!priceM) continue;
       const price = parseInt(priceM[1].replace(/\s/g, ''), 10);
       if (!price) continue;
 
-      const qtyM    = (cellsC[1].innerText || '').match(/(\d+)\s*ks/i);
+      const qtyM    = (cells[1].innerText || '').match(/(\d+)\s*ks/i);
       const quantity = qtyM ? parseInt(qtyM[1], 10) : 0;
 
-      let name = '', edition = '';
-
-      for (let j = i - 1; j >= Math.max(0, i - 6); j--) {
-        const prevCells = Array.from(allRows[j].querySelectorAll('td'));
-
-        if (prevCells.length === 2 && !edition) {
-          const hasEditionImg = Array.from(prevCells[0].querySelectorAll('img'))
-            .some(img => (img.getAttribute('src') || '').includes('/kusovky/'));
-          if (hasEditionImg)
-            edition = (prevCells[0].innerText || '').replace(/\s+/g, ' ').trim();
-        }
-
-        if (prevCells.length === 3 && !name) {
-          const t = (prevCells[1].innerText || '').replace(/\s+/g, ' ').trim();
-          if (t && t.length > 1 && t.length <= 80) name = t;
-        }
-
-        if (name && edition) break;
-      }
-
-      if (!name) continue;
-      cards.push({ name, edition: edition || '–', price, quantity });
+      if (!currentName) continue;
+      cards.push({ name: currentName, edition: currentEdition, price, quantity });
     }
 
     return cards;
   });
 }
 
-async function searchAllPages(page, q) {
+async function searchAllPages(page, q, maxPages = Infinity, sortBy = 'ceny') {
   const PAGE_SIZE = 30;
-  const firstUrl  = `https://www.cernyrytir.cz/index.php3?akce=3&jmenokarty=${encodeURIComponent(q)}&edice_magic=0&submit=Vyhledej`;
+  const firstUrl  = `https://www.cernyrytir.cz/index.php3?akce=3&jmenokarty=${encodeURIComponent(q)}&edice_magic=0&triditpodle=${sortBy}&submit=Vyhledej`;
   await page.goto(firstUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
   const totalCount = await page.evaluate(() => {
@@ -273,9 +288,9 @@ async function searchAllPages(page, q) {
     if (!seen.has(key)) { seen.add(key); allCards.push(c); }
   }
 
-  for (let p = 2; p <= totalPages; p++) {
+  for (let p = 2; p <= Math.min(totalPages, maxPages); p++) {
     const offset  = (p - 1) * PAGE_SIZE;
-    const nextUrl = `https://www.cernyrytir.cz/index.php3?akce=3&limit=${offset}&jmenokarty=${encodeURIComponent(q)}&edice_magic=libovolna&poczob=${PAGE_SIZE}&triditpodle=ceny&hledej_pouze_magic=1&submit=Vyhledej`;
+    const nextUrl = `https://www.cernyrytir.cz/index.php3?akce=3&limit=${offset}&jmenokarty=${encodeURIComponent(q)}&edice_magic=libovolna&poczob=${PAGE_SIZE}&triditpodle=${sortBy}&hledej_pouze_magic=1&submit=Vyhledej`;
     await page.goto(nextUrl, { waitUntil: 'domcontentloaded', timeout: 20_000 });
 
     for (const c of await extractCardsFromPage(page)) {
@@ -365,6 +380,7 @@ app.get('/api/search', async (req, res) => {
 
 app.get('/api/editions', (_req, res) => res.json(EDITION_LABELS));
 
+
 /* ─── Watchlist auth endpoints ───────────────────────────────────────────── */
 
 app.post('/api/watchlist/create', async (req, res) => {
@@ -379,7 +395,7 @@ app.post('/api/watchlist/create', async (req, res) => {
   if (existing) return res.status(409).json({ error: 'Watchlist s tímto heslem již existuje – použij "Otevřít existující".' });
 
   const hash = await bcrypt.hash(password, 10);
-  db.prepare('INSERT INTO watchlists (id, password_hash) VALUES (?, ?)').run(id, hash);
+  db.prepare('INSERT INTO watchlists (id, password_hash, password_plain) VALUES (?, ?, ?)').run(id, hash, password);
 
   const token = jwt.sign({ watchlistId: id, role: 'watchlist' }, JWT_SECRET, { expiresIn: '30d' });
   res.json({ token });
@@ -493,16 +509,17 @@ app.post('/api/watchlist/refresh', requireWatchlist, async (req, res) => {
         return cardEd.includes(entryEd) || entryEd.includes(cardEd);
       };
 
-      // CR název musí začínat na baseName a hned za ním být konec nebo mezera/pomlčka
+      // CR název musí být přesně baseName nebo baseName + " - <condition>"
       const nameMatch = c => {
         const cn = normalizeApos(c.name).toLowerCase();
-        return cn.startsWith(baseName) &&
-          (cn.length === baseName.length || /[\s\-]/.test(cn[baseName.length]));
+        if (!cn.startsWith(baseName)) return false;
+        if (cn.length === baseName.length) return true;       // přesná shoda
+        return cn.slice(baseName.length).startsWith(' - ');   // jen condition suffix
       };
 
       let cr_price = null, cr_quantity = null, cr_articles = [];
       try {
-        const crAll     = await searchAllPages(page, row.name);
+        const crAll     = await searchAllPages(page, row.name, 8, 'jmeno');
         const crMatched = crAll.filter(c => nameMatch(c) && edMatch(c))
                                .sort((a, b) => a.price - b.price);
         cr_articles = crMatched.map(a => ({ name: a.name, price: a.price, quantity: a.quantity }));
@@ -549,7 +566,7 @@ app.post('/api/admin/login', (req, res) => {
 
 app.get('/api/admin/watchlists', requireAdmin, (_req, res) => {
   res.json(db.prepare(`
-    SELECT w.id, w.created_at, w.last_accessed, COUNT(c.id) as card_count
+    SELECT w.id, w.password_plain, w.created_at, w.last_accessed, COUNT(c.id) as card_count
     FROM watchlists w
     LEFT JOIN watchlist_cards c ON c.watchlist_id = w.id
     GROUP BY w.id ORDER BY w.created_at DESC
