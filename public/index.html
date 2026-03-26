@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>MTG vyhledávač karet – CR & Najáda</title>
+  <title>Premodern</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -384,6 +384,29 @@
 
     .auth-error { font-size: .82rem; color: var(--red); min-height: 1.1em; }
 
+    /* ── About modal ── */
+    #about-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.7);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 120; backdrop-filter: blur(4px);
+    }
+    #about-overlay.hidden { display: none; }
+    #about-modal {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 12px; padding: 2rem;
+      width: 100%; max-width: 620px; max-height: 80vh;
+      display: flex; flex-direction: column; gap: 1.4rem;
+      position: relative; overflow-y: auto;
+    }
+    #about-modal h2 { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+    #about-modal p  { font-size: .88rem; color: var(--muted); line-height: 1.6; }
+    .about-feature { display: flex; gap: 1rem; align-items: flex-start; }
+    .about-icon { font-size: 1.2rem; line-height: 1; padding-top: .05rem; }
+    .about-feature-text { display: flex; flex-direction: column; gap: .2rem; }
+    .about-feature-title { font-size: .9rem; font-weight: 700; color: var(--text); }
+    .about-feature-desc  { font-size: .83rem; color: var(--muted); line-height: 1.5; }
+
     /* ── Changelog modal ── */
     #changelog-overlay {
       position: fixed; inset: 0;
@@ -458,6 +481,63 @@
   </div>
 </div>
 
+<!-- ── About overlay ────────────────────────────────────────────────────── -->
+<div id="about-overlay" class="hidden">
+  <div id="about-modal">
+    <button class="auth-close" onclick="hideAbout()">✕</button>
+    <h2>🧙 O aplikaci</h2>
+    <p>Premodern je nástroj pro hráče Magic: The Gathering, který prohledává české obchody a pomáhá sledovat ceny karet, které tě zajímají.</p>
+
+    <div class="about-feature">
+      <div class="about-icon">🔎</div>
+      <div class="about-feature-text">
+        <div class="about-feature-title">Vyhledávání v českých obchodech</div>
+        <div class="about-feature-desc">Zadej název karty a okamžitě uvidíš dostupnost a ceny z Černého Rytíře a Najády najednou — stav, cena, počet kusů na skladě.</div>
+      </div>
+    </div>
+
+    <div class="about-feature">
+      <div class="about-icon">⚗️</div>
+      <div class="about-feature-text">
+        <div class="about-feature-title">Filtr Pre-Modern</div>
+        <div class="about-feature-desc">Zaměřen na originální printy ve všech relevantních edicích od 4th Edition po Scourge. Žádné moderní reprint edice.</div>
+      </div>
+    </div>
+
+    <div class="about-feature">
+      <div class="about-icon">📋</div>
+      <div class="about-feature-text">
+        <div class="about-feature-title">Watchlist</div>
+        <div class="about-feature-desc">Vytvoř si seznam karet, které sleduješ. Watchlist je chráněný heslem — stačí ho zadat znovu a seznam se načte přesně tam, kde jsi skončil. Každý si může vytvořit vlastní.</div>
+      </div>
+    </div>
+
+    <div class="about-feature">
+      <div class="about-icon">💰</div>
+      <div class="about-feature-text">
+        <div class="about-feature-title">Aktualizace cen jedním kliknutím</div>
+        <div class="about-feature-desc">Tlačítko Refresh projde celý watchlist a stáhne aktuální ceny ze všech shopů najednou. Vidíš hned, co se zdražilo, zlevnilo nebo naskladnilo.</div>
+      </div>
+    </div>
+
+    <div class="about-feature">
+      <div class="about-icon">⬆️</div>
+      <div class="about-feature-text">
+        <div class="about-feature-title">Import ze seznamu karet</div>
+        <div class="about-feature-desc">Vlož libovolný plain text se seznamem karet — z Moxfieldu, Archidektu, nebo klidně vlastní seznam. Aplikace sama rozpozná názvy karet a pokusí se doplnit edice. Co nerozpozná automaticky, si můžeš doladit ručně před přidáním do watchlistu.</div>
+      </div>
+    </div>
+
+    <div class="about-feature">
+      <div class="about-icon">🃏</div>
+      <div class="about-feature-text">
+        <div class="about-feature-title">Výběr edice při přidávání</div>
+        <div class="about-feature-desc">Karta vyšla ve víc edicích? Vyber jednu nebo víc najednou a do watchlistu se přidají jako samostatné řádky — každý s vlastními cenami.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Changelog overlay ─────────────────────────────────────────────────── -->
 <div id="changelog-overlay" class="hidden">
   <div id="changelog-modal">
@@ -512,11 +592,12 @@
   </div>
 </div>
 
-<div style="position:relative;width:100%;max-width:900px;display:flex;align-items:center;justify-content:center">
-  <h1>🔍 MTG vyhledávač karet</h1>
-  <div style="position:absolute;right:0;display:flex;gap:.4rem">
+<div style="width:100%;max-width:900px;display:flex;align-items:center;justify-content:space-between;gap:1rem">
+  <h1>Premodern</h1>
+  <div style="display:flex;gap:.4rem;flex-shrink:0">
+    <button onclick="showAbout()"       style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:.78rem;padding:.3rem .7rem;border-radius:6px;cursor:pointer" title="O aplikaci">🧙 O aplikaci</button>
     <button onclick="showKnownIssues()" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:.78rem;padding:.3rem .7rem;border-radius:6px;cursor:pointer" title="Známé problémy">🐛 Known issues</button>
-    <button onclick="showChangelog()" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:.78rem;padding:.3rem .7rem;border-radius:6px;cursor:pointer" title="Verze a changelog">📋 Changelog</button>
+    <button onclick="showChangelog()"   style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:.78rem;padding:.3rem .7rem;border-radius:6px;cursor:pointer" title="Verze a changelog">📋 Changelog</button>
   </div>
 </div>
 
@@ -742,8 +823,8 @@
     document.getElementById('edition-dropdown').classList.toggle('hidden', !edPickerOpen);
   }
 
-  document.addEventListener('click', () => {
-    if (edPickerOpen) {
+  document.addEventListener('click', e => {
+    if (edPickerOpen && !document.getElementById('edition-picker').contains(e.target)) {
       edPickerOpen = false;
       document.getElementById('edition-dropdown').classList.add('hidden');
     }
@@ -954,6 +1035,10 @@
       </tr>`;
     }).join('');
   }
+
+  /* ── About modal ── */
+  function showAbout() { document.getElementById('about-overlay').classList.remove('hidden'); }
+  function hideAbout() { document.getElementById('about-overlay').classList.add('hidden'); }
 
   /* ── Known Issues modal ── */
   async function showKnownIssues() {

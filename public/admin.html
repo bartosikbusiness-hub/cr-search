@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CR Search – Admin</title>
+  <title>Premodern – Admin</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -69,11 +69,130 @@
     tbody tr:last-child td { border-bottom: none; }
     .mono { font-family: monospace; font-size: .8rem; color: var(--muted); }
     .empty { color: var(--muted); padding: 1.5rem 1rem; font-size: .9rem; text-align: center; }
+
+    /* ── Overlay modals ── */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.7);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 120; backdrop-filter: blur(4px);
+    }
+    .overlay.hidden { display: none; }
+    .modal {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 12px; padding: 2rem; width: 100%; max-width: 560px;
+      max-height: 80vh; overflow-y: auto; position: relative;
+      display: flex; flex-direction: column; gap: 1rem;
+    }
+    .modal h2 { font-size: 1.1rem; font-weight: 700; }
+    .btn-close {
+      position: absolute; top: 1rem; right: 1rem;
+      background: transparent; border: none; color: var(--muted);
+      font-size: 1.1rem; cursor: pointer; padding: .2rem .5rem;
+    }
+    .btn-close:hover { color: var(--text); background: transparent; }
+    .cl-entry { display: flex; gap: .8rem; align-items: baseline; }
+    .cl-version { font-size: .82rem; font-weight: 700; color: var(--purple); white-space: nowrap; }
+    .cl-desc { font-size: .88rem; color: var(--text); }
+    .ki-entry { display: flex; gap: .8rem; align-items: baseline; }
+    .ki-badge { font-size: .7rem; font-weight: 700; padding: .15rem .45rem; border-radius: 4px; white-space: nowrap; }
+    .ki-low    { background: #2a2a10; color: #c8b800; }
+    .ki-medium { background: #2a1500; color: #e07020; }
+    .ki-high   { background: #2a0a0a; color: var(--red); }
+    .ki-info   { background: #101828; color: #60a0e0; }
+    .ki-desc   { font-size: .88rem; color: var(--text); }
+    .about-feature { display: flex; gap: 1rem; align-items: flex-start; }
+    .about-icon { font-size: 1.2rem; line-height: 1; padding-top: .05rem; }
+    .about-feature-text { display: flex; flex-direction: column; gap: .2rem; }
+    .about-feature-title { font-size: .9rem; font-weight: 700; color: var(--text); }
+    .about-feature-desc  { font-size: .83rem; color: var(--muted); line-height: 1.5; }
+    .modal p { font-size: .88rem; color: var(--muted); line-height: 1.6; }
   </style>
 </head>
 <body>
 
-<h1>🔧 Admin panel</h1>
+<div style="width:100%;max-width:800px;display:flex;align-items:center;justify-content:space-between;gap:1rem">
+  <h1>🔧 Admin panel</h1>
+  <div style="display:flex;gap:.4rem;flex-shrink:0">
+    <button onclick="showAbout()"       style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:.78rem;padding:.3rem .7rem;border-radius:6px;cursor:pointer">🧙 O aplikaci</button>
+    <button onclick="showKnownIssues()" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:.78rem;padding:.3rem .7rem;border-radius:6px;cursor:pointer">🐛 Known issues</button>
+    <button onclick="showChangelog()"   style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:.78rem;padding:.3rem .7rem;border-radius:6px;cursor:pointer">📋 Changelog</button>
+  </div>
+</div>
+
+<!-- About overlay -->
+<div id="about-overlay" class="overlay hidden">
+  <div class="modal">
+    <button class="btn-close" onclick="hideAbout()">✕</button>
+    <h2>🧙 O aplikaci</h2>
+    <p>Premodern je nástroj pro hráče Magic: The Gathering, který prohledává české obchody a pomáhá sledovat ceny karet, které tě zajímají.</p>
+
+    <div class="about-feature">
+      <div class="about-icon">🔎</div>
+      <div class="about-feature-text">
+        <div class="about-feature-title">Vyhledávání v českých obchodech</div>
+        <div class="about-feature-desc">Zadej název karty a okamžitě uvidíš dostupnost a ceny z Černého Rytíře a Najády najednou — stav, cena, počet kusů na skladě.</div>
+      </div>
+    </div>
+
+    <div class="about-feature">
+      <div class="about-icon">⚗️</div>
+      <div class="about-feature-text">
+        <div class="about-feature-title">Filtr Pre-Modern</div>
+        <div class="about-feature-desc">Zaměřen na originální printy ve všech relevantních edicích od 4th Edition po Scourge. Žádné moderní reprint edice.</div>
+      </div>
+    </div>
+
+    <div class="about-feature">
+      <div class="about-icon">📋</div>
+      <div class="about-feature-text">
+        <div class="about-feature-title">Watchlist</div>
+        <div class="about-feature-desc">Vytvoř si seznam karet, které sleduješ. Watchlist je chráněný heslem — stačí ho zadat znovu a seznam se načte přesně tam, kde jsi skončil. Každý si může vytvořit vlastní.</div>
+      </div>
+    </div>
+
+    <div class="about-feature">
+      <div class="about-icon">💰</div>
+      <div class="about-feature-text">
+        <div class="about-feature-title">Aktualizace cen jedním kliknutím</div>
+        <div class="about-feature-desc">Tlačítko Refresh projde celý watchlist a stáhne aktuální ceny ze všech shopů najednou. Vidíš hned, co se zdražilo, zlevnilo nebo naskladnilo.</div>
+      </div>
+    </div>
+
+    <div class="about-feature">
+      <div class="about-icon">⬆️</div>
+      <div class="about-feature-text">
+        <div class="about-feature-title">Import ze seznamu karet</div>
+        <div class="about-feature-desc">Vlož libovolný plain text se seznamem karet — z Moxfieldu, Archidektu, nebo klidně vlastní seznam. Aplikace sama rozpozná názvy karet a pokusí se doplnit edice. Co nerozpozná automaticky, si můžeš doladit ručně před přidáním do watchlistu.</div>
+      </div>
+    </div>
+
+    <div class="about-feature">
+      <div class="about-icon">🃏</div>
+      <div class="about-feature-text">
+        <div class="about-feature-title">Výběr edice při přidávání</div>
+        <div class="about-feature-desc">Karta vyšla ve víc edicích? Vyber jednu nebo víc najednou a do watchlistu se přidají jako samostatné řádky — každý s vlastními cenami.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Known Issues overlay -->
+<div id="ki-overlay" class="overlay hidden">
+  <div class="modal">
+    <button class="btn-close" onclick="hideKnownIssues()">✕</button>
+    <h2>🐛 Known Issues</h2>
+    <div id="ki-body"><span style="color:var(--muted)">Načítám…</span></div>
+  </div>
+</div>
+
+<!-- Changelog overlay -->
+<div id="cl-overlay" class="overlay hidden">
+  <div class="modal">
+    <button class="btn-close" onclick="hideChangelog()">✕</button>
+    <h2>📋 Changelog</h2>
+    <div id="cl-body"><span style="color:var(--muted)">Načítám…</span></div>
+  </div>
+</div>
 
 <!-- Login -->
 <div class="login-box" id="login-box">
@@ -186,6 +305,41 @@
       </tr>
     `).join('');
   }
+
+  /* ── About ── */
+  function showAbout() { document.getElementById('about-overlay').classList.remove('hidden'); }
+  function hideAbout() { document.getElementById('about-overlay').classList.add('hidden'); }
+
+  /* ── Known Issues ── */
+  async function showKnownIssues() {
+    document.getElementById('ki-overlay').classList.remove('hidden');
+    const body = document.getElementById('ki-body');
+    try {
+      const data = await fetch('/api/known-issues').then(r => r.json());
+      if (!data.length) { body.innerHTML = '<span style="color:var(--green)">✓ Žádné známé problémy.</span>'; return; }
+      body.innerHTML = data.map(e => `
+        <div class="ki-entry">
+          <span class="ki-badge ki-${e.severity}">${e.severity.toUpperCase()}</span>
+          <span class="ki-desc">${esc(e.desc)}</span>
+        </div>`).join('');
+    } catch { body.innerHTML = '<span style="color:var(--red)">Chyba při načítání.</span>'; }
+  }
+  function hideKnownIssues() { document.getElementById('ki-overlay').classList.add('hidden'); }
+
+  /* ── Changelog ── */
+  async function showChangelog() {
+    document.getElementById('cl-overlay').classList.remove('hidden');
+    const body = document.getElementById('cl-body');
+    try {
+      const data = await fetch('/api/changelog').then(r => r.json());
+      body.innerHTML = data.map(e => `
+        <div class="cl-entry">
+          <span class="cl-version">${esc(e.version)}</span>
+          <span class="cl-desc">${esc(e.changes)}</span>
+        </div>`).join('');
+    } catch { body.innerHTML = '<span style="color:var(--red)">Chyba při načítání.</span>'; }
+  }
+  function hideChangelog() { document.getElementById('cl-overlay').classList.add('hidden'); }
 
   async function deleteWatchlist(id, btn) {
     if (!confirm(`Smazat watchlist ${id}?`)) return;
