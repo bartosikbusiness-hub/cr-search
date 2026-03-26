@@ -15,8 +15,8 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 
 const USER_AGENT     = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36';
-const JWT_SECRET     = process.env.JWT_SECRET     || 'dev-secret-cr-search';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const JWT_SECRET     = process.env.JWT_SECRET;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const MAX_WATCHLISTS = parseInt(process.env.MAX_WATCHLISTS || '100', 10);
 const DATA_DIR       = path.join(__dirname, 'data');
 
@@ -26,6 +26,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 /* ─── Changelog ──────────────────────────────────────────────────────────── */
 
 const CHANGELOG = [
+  { version: 'v3.3', changes: 'Admin panel: zobrazení plaintext hesla watchlistu – sloupec Heslo vedle ID hashe' },
   { version: 'v3.2', changes: 'Zobrazení jména watchlistu vedle Odhlásit – skryté pod tečkami, kliknutím se odhalí na 3 s; multi-edition picker; Known Issues sekce v hlavičce' },
   { version: 'v3.1', changes: 'Import z Moxfieldu – tlačítko Import, parsování textu, Scryfall API auto-detekce Pre-Modern edic, dropdown pro více možností' },
   { version: 'v3.0', changes: 'Watchlist chráněn heslem – vytvoření/přihlášení, JWT tokeny, SQLite DB, admin panel (/admin), migrace starých dat' },
@@ -583,7 +584,7 @@ app.delete('/api/admin/watchlists/:id', requireAdmin, (req, res) => {
 
 migrateOldWatchlist().then(() => {
   app.listen(PORT, () => {
-    console.log(`\n🔍  CR Search  →  http://localhost:${PORT}`);
+    console.log(`\n🔍  Premodern  →  http://localhost:${PORT}`);
     console.log(`🔧  Admin      →  http://localhost:${PORT}/admin.html\n`);
   });
 });
