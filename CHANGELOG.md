@@ -1,5 +1,11 @@
 # Changelog – CR Search
 
+## v3.4 (2026-03-26)
+- Aplikace přejmenována na **Premodern**
+- Přidána sekce **O aplikaci** (🧙) na hlavní stránce i v admin panelu
+- Known Issues a Changelog tlačítka přidána do admin panelu
+- Aktualizovány popisky v About: Pre-Modern filtr a import ze seznamu karet
+
 ## v3.3 (2026-03-26)
 - Admin panel: nový sloupec **Heslo** zobrazuje plaintext heslo watchlistu
 - DB migrace: přidán sloupec `password_plain` do tabulky `watchlists`
