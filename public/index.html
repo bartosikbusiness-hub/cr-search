@@ -93,6 +93,21 @@
     button.btn-danger { background: #7a1020; }
     button.btn-danger:hover { background: var(--red); }
 
+    .wl-name-badge {
+      display      : inline-flex;
+      align-items  : center;
+      cursor       : pointer;
+      font-family  : monospace;
+      font-size    : .85rem;
+      color        : var(--muted);
+      padding      : 4px 8px;
+      border-radius: 6px;
+      border       : 1px solid var(--border);
+      user-select  : none;
+      transition   : color .2s;
+    }
+    .wl-name-badge:hover { color: var(--text); }
+
     button.btn-outline {
       background  : transparent;
       border      : 1px solid var(--border);
@@ -167,7 +182,51 @@
       margin-bottom: 1rem;
     }
     .watchlist-form input { flex: 1; min-width: 160px; }
-    .watchlist-form select { min-width: 180px; }
+
+    /* multi-edition picker */
+    .edition-picker { position: relative; min-width: 180px; }
+    .edition-btn {
+      width: 100%; text-align: left; background: var(--row);
+      border: 1px solid var(--border); color: var(--text);
+      padding: .55rem .8rem; border-radius: var(--radius);
+      cursor: pointer; font-size: .9rem; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .edition-btn:hover { border-color: var(--glow); }
+    .edition-dropdown {
+      position: absolute; top: calc(100% + 4px); left: 0;
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: .4rem 0;
+      min-width: 220px; max-height: 260px; overflow-y: auto;
+      z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,.5);
+    }
+    .edition-dropdown.hidden { display: none; }
+    .edition-dropdown label {
+      display     : flex;
+      align-items : center;
+      gap         : 5px;
+      padding     : 4px 8px;
+      cursor      : pointer;
+      font-size   : .85rem;
+      user-select : none;
+    }
+    .edition-dropdown label:hover { background: var(--row-alt); }
+    .edition-dropdown label input[type=checkbox] {
+      appearance   : auto;
+      -webkit-appearance: checkbox;
+      accent-color : var(--glow);
+      width        : 15px;
+      height       : 15px;
+      min-width    : 15px;
+      margin       : 0;
+      cursor       : pointer;
+      order        : 0;
+    }
+    .edition-dropdown label span {
+      order      : 1;
+      text-align : left;
+      flex       : 1;
+    }
 
     .watchlist-toolbar {
       display        : flex;
@@ -325,6 +384,36 @@
 
     .auth-error { font-size: .82rem; color: var(--red); min-height: 1.1em; }
 
+    /* ── Changelog modal ── */
+    #changelog-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.7);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 120; backdrop-filter: blur(4px);
+    }
+    #changelog-overlay.hidden { display: none; }
+    #changelog-modal {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 12px; padding: 2rem;
+      width: 100%; max-width: 620px; max-height: 80vh;
+      display: flex; flex-direction: column; gap: 1.2rem;
+      position: relative; overflow-y: auto;
+    }
+    #changelog-modal h2 { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+    .cl-entry { border-bottom: 1px solid var(--border); padding-bottom: .9rem; display: flex; gap: 1rem; align-items: baseline; }
+    .cl-entry:last-child { border-bottom: none; padding-bottom: 0; }
+    .cl-version { font-weight: 700; color: var(--purple); min-width: 3.5rem; font-size: .9rem; }
+    .cl-desc { font-size: .85rem; color: var(--text); line-height: 1.5; }
+
+    /* ── Known Issues modal ── */
+    .ki-entry { display:flex; gap:.8rem; align-items:baseline; padding:.6rem 0; border-bottom:1px solid var(--border); }
+    .ki-entry:last-child { border-bottom:none; }
+    .ki-badge { font-size:.72rem; font-weight:700; padding:.15rem .45rem; border-radius:4px; white-space:nowrap; }
+    .ki-low  { background:#2a2a10; color:var(--gold); }
+    .ki-mid  { background:#2a1010; color:#f08040; }
+    .ki-high { background:#2a0808; color:var(--red); }
+    .ki-desc { font-size:.85rem; color:var(--text); line-height:1.5; }
+
     /* ── Import modal ── */
     #import-overlay {
       position  : fixed; inset: 0;
@@ -359,6 +448,24 @@
   </style>
 </head>
 <body>
+
+<!-- ── Known Issues overlay ──────────────────────────────────────────────── -->
+<div id="ki-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);align-items:center;justify-content:center;z-index:120;backdrop-filter:blur(4px)">
+  <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:2rem;width:100%;max-width:560px;max-height:80vh;overflow-y:auto;position:relative;display:flex;flex-direction:column;gap:1.2rem">
+    <button class="auth-close" onclick="hideKnownIssues()">✕</button>
+    <h2 style="font-size:1.1rem;font-weight:700">🐛 Known Issues</h2>
+    <div id="ki-body"><span style="color:var(--muted)">Načítám…</span></div>
+  </div>
+</div>
+
+<!-- ── Changelog overlay ─────────────────────────────────────────────────── -->
+<div id="changelog-overlay" class="hidden">
+  <div id="changelog-modal">
+    <button class="auth-close" onclick="hideChangelog()">✕</button>
+    <h2>📋 Changelog</h2>
+    <div id="changelog-body"><span style="color:var(--muted)">Načítám…</span></div>
+  </div>
+</div>
 
 <!-- ── Import overlay ───────────────────────────────────────────────────── -->
 <div id="import-overlay" class="hidden">
@@ -405,7 +512,13 @@
   </div>
 </div>
 
-<h1>🔍 MTG vyhledávač karet</h1>
+<div style="position:relative;width:100%;max-width:900px;display:flex;align-items:center;justify-content:center">
+  <h1>🔍 MTG vyhledávač karet</h1>
+  <div style="position:absolute;right:0;display:flex;gap:.4rem">
+    <button onclick="showKnownIssues()" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:.78rem;padding:.3rem .7rem;border-radius:6px;cursor:pointer" title="Známé problémy">🐛 Known issues</button>
+    <button onclick="showChangelog()" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:.78rem;padding:.3rem .7rem;border-radius:6px;cursor:pointer" title="Verze a changelog">📋 Changelog</button>
+  </div>
+</div>
 
 <!-- ── Vyhledávání ───────────────────────────────────────────────────────── -->
 <div class="section">
@@ -430,7 +543,10 @@
 
   <div class="watchlist-form">
     <input type="text" id="wl-name" placeholder="Název karty, např. Counterspell" autocomplete="off" />
-    <select id="wl-edition"><option value="">— vyber edici —</option></select>
+    <div class="edition-picker" id="edition-picker">
+      <button type="button" class="edition-btn" id="edition-btn" onclick="toggleEditionPicker(event)">— vyber edici —</button>
+      <div class="edition-dropdown hidden" id="edition-dropdown"></div>
+    </div>
     <button onclick="addToWatchlist()">Přidat</button>
     <button onclick="showImportModal()" style="background:var(--panel);border:1px solid var(--border);color:var(--text)">⬆ Import</button>
   </div>
@@ -469,11 +585,14 @@
 
 <script>
   const TOKEN_KEY = 'cr_wl_token';
+  const NAME_KEY  = 'cr_wl_name';
 
   /* ── Helpers ── */
   function getToken()       { return localStorage.getItem(TOKEN_KEY); }
   function setToken(t)      { localStorage.setItem(TOKEN_KEY, t); }
-  function clearToken()     { localStorage.removeItem(TOKEN_KEY); }
+  function clearToken()     { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(NAME_KEY); }
+  function getWlName()      { return localStorage.getItem(NAME_KEY) || ''; }
+  function setWlName(n)     { localStorage.setItem(NAME_KEY, n); }
 
   function authHeaders() {
     return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() };
@@ -514,11 +633,35 @@
     renderWatchlist(await res.json());
   }
 
+  let _wlNameVisible = false;
+  let _wlNameTimer   = null;
+
+  function toggleWlName() {
+    const el   = document.getElementById('wl-name-reveal');
+    const name = getWlName();
+    if (!el || !name) return;
+    if (_wlNameVisible) {
+      el.textContent  = '●●●●●●●●';
+      _wlNameVisible  = false;
+      clearTimeout(_wlNameTimer);
+    } else {
+      el.textContent  = name;
+      _wlNameVisible  = true;
+      _wlNameTimer    = setTimeout(() => {
+        el.textContent = '●●●●●●●●';
+        _wlNameVisible = false;
+      }, 3000);
+    }
+  }
+
   function updateAuthArea(loggedIn) {
     const area = document.getElementById('wl-auth-area');
     if (loggedIn) {
       area.innerHTML = `
         <button class="btn-outline btn-sm" onclick="doLogout()">Odhlásit</button>
+        <span class="wl-name-badge" onclick="toggleWlName()" title="Klikni pro zobrazení hesla">
+          <span id="wl-name-reveal">●●●●●●●●</span>
+        </span>
         <button class="btn-danger btn-sm" onclick="deleteWatchlist()">🗑 Smazat watchlist</button>`;
     } else {
       area.innerHTML = `<button class="btn-outline" onclick="showAuthModal()">🔐 Přihlásit se k watchlistu</button>`;
@@ -539,6 +682,7 @@
     if (!res.ok) { err.textContent = data.error; return; }
 
     setToken(data.token);
+    setWlName(pw);
     document.getElementById('auth-pw-open').value = '';
     hideAuthModal();
     updateAuthArea(true);
@@ -556,6 +700,7 @@
     if (!res.ok) { err.textContent = data.error; return; }
 
     setToken(data.token);
+    setWlName(pw);
     document.getElementById('auth-pw-create').value = '';
     hideAuthModal();
     updateAuthArea(true);
@@ -577,16 +722,48 @@
     renderWatchlist([]);
   }
 
-  /* ── Editions dropdown ── */
+  /* ── Multi-edition picker ── */
+  let edPickerOpen = false;
+
   async function loadEditions() {
     const res  = await fetch('/api/editions');
     const list = await res.json();
-    const sel  = document.getElementById('wl-edition');
-    list.forEach(e => {
-      const opt = document.createElement('option');
-      opt.value = opt.textContent = e;
-      sel.appendChild(opt);
-    });
+    const dd   = document.getElementById('edition-dropdown');
+    dd.innerHTML = list.map(e =>
+      `<label style="display:flex;align-items:center;gap:6px;padding:3px 8px;cursor:pointer;font-size:.85rem;user-select:none">` +
+      `<input type="checkbox" style="width:14px;height:14px;margin:0;flex-shrink:0;cursor:pointer;accent-color:#5e4ec0" value="${esc(e)}" onchange="updateEditionBtn()">` +
+      `<span>${esc(e)}</span></label>`
+    ).join('');
+  }
+
+  function toggleEditionPicker(e) {
+    e.stopPropagation();
+    edPickerOpen = !edPickerOpen;
+    document.getElementById('edition-dropdown').classList.toggle('hidden', !edPickerOpen);
+  }
+
+  document.addEventListener('click', () => {
+    if (edPickerOpen) {
+      edPickerOpen = false;
+      document.getElementById('edition-dropdown').classList.add('hidden');
+    }
+  });
+
+  function getSelectedEditions() {
+    return Array.from(document.querySelectorAll('#edition-dropdown input:checked')).map(cb => cb.value);
+  }
+
+  function updateEditionBtn() {
+    const sel = getSelectedEditions();
+    const btn = document.getElementById('edition-btn');
+    if (sel.length === 0)      btn.textContent = '— vyber edici —';
+    else if (sel.length === 1) btn.textContent = sel[0];
+    else                       btn.textContent = `${sel.length} edice vybrány`;
+  }
+
+  function clearEditionPicker() {
+    document.querySelectorAll('#edition-dropdown input:checked').forEach(cb => cb.checked = false);
+    updateEditionBtn();
   }
 
   /* ── Search ── */
@@ -661,22 +838,23 @@
 
   /* ── Watchlist add ── */
   async function addToWatchlist() {
-    const name    = document.getElementById('wl-name').value.trim();
-    const edition = document.getElementById('wl-edition').value;
-    if (!name || !edition) { alert('Zadej název karty a vyber edici.'); return; }
+    const name     = document.getElementById('wl-name').value.trim();
+    const editions = getSelectedEditions();
+    if (!name)             { alert('Zadej název karty.'); return; }
+    if (!editions.length)  { alert('Vyber alespoň jednu edici.'); return; }
 
-    const res = await fetch('/api/watchlist/add', {
+    const res = await fetch('/api/watchlist/add-bulk', {
       method : 'POST',
-      headers: authHeaders(),
-      body   : JSON.stringify({ name, edition }),
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body   : JSON.stringify({ name, editions }),
     });
     if (res.status === 401) { clearToken(); showAuthModal(); return; }
-    const entry = await res.json();
-    if (!res.ok) { alert(entry.error); return; }
+    const data = await res.json();
+    if (!res.ok) { alert(data.error); return; }
 
-    document.getElementById('wl-name').value    = '';
-    document.getElementById('wl-edition').value = '';
-    await loadWatchlist();
+    document.getElementById('wl-name').value = '';
+    clearEditionPicker();
+    renderWatchlist(data.list);
   }
 
   /* ── Watchlist remove card ── */
@@ -775,6 +953,39 @@
         <td class="col-action"><button class="btn-remove" title="Odebrat" onclick="removeFromWatchlist('${e.id}')">✕</button></td>
       </tr>`;
     }).join('');
+  }
+
+  /* ── Known Issues modal ── */
+  async function showKnownIssues() {
+    document.getElementById('ki-overlay').style.display = 'flex';
+    const body = document.getElementById('ki-body');
+    try {
+      const data = await fetch('/api/known-issues').then(r => r.json());
+      if (!data.length) { body.innerHTML = '<span style="color:var(--green)">✓ Žádné známé problémy.</span>'; return; }
+      body.innerHTML = data.map(e => `
+        <div class="ki-entry">
+          <span class="ki-badge ki-${e.severity}">${e.severity.toUpperCase()}</span>
+          <span class="ki-desc">${esc(e.desc)}</span>
+        </div>`).join('');
+    } catch { body.innerHTML = '<span style="color:var(--red)">Chyba při načítání.</span>'; }
+  }
+  function hideKnownIssues() { document.getElementById('ki-overlay').style.display = 'none'; }
+
+  /* ── Changelog modal ── */
+  async function showChangelog() {
+    document.getElementById('changelog-overlay').classList.remove('hidden');
+    const body = document.getElementById('changelog-body');
+    try {
+      const data = await fetch('/api/changelog').then(r => r.json());
+      body.innerHTML = data.map(e => `
+        <div class="cl-entry">
+          <span class="cl-version">${esc(e.version)}</span>
+          <span class="cl-desc">${esc(e.changes)}</span>
+        </div>`).join('');
+    } catch { body.innerHTML = '<span style="color:var(--red)">Chyba při načítání.</span>'; }
+  }
+  function hideChangelog() {
+    document.getElementById('changelog-overlay').classList.add('hidden');
   }
 
   /* ── Import modal ── */

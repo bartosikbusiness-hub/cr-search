@@ -23,6 +23,31 @@ const DATA_DIR       = path.join(__dirname, 'data');
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+/* ─── Changelog ──────────────────────────────────────────────────────────── */
+
+const CHANGELOG = [
+  { version: 'v3.2', changes: 'Zobrazení jména watchlistu vedle Odhlásit – skryté pod tečkami, kliknutím se odhalí na 3 s; multi-edition picker; Known Issues sekce v hlavičce' },
+  { version: 'v3.1', changes: 'Import z Moxfieldu – tlačítko Import, parsování textu, Scryfall API auto-detekce Pre-Modern edic, dropdown pro více možností' },
+  { version: 'v3.0', changes: 'Watchlist chráněn heslem – vytvoření/přihlášení, JWT tokeny, SQLite DB, admin panel (/admin), migrace starých dat' },
+  { version: 'v2.6', changes: 'Sloupec "Aktualizováno" odstraněn – čas přesunut vedle buttonu; Najáda rozdělena na 3 samostatné sloupce: NJ Stav / NJ Cena / NJ Sklad' },
+  { version: 'v2.5', changes: 'Zelené zvýraznění řádku watchlistu pokud je karta skladem alespoň na jednom shopu' },
+  { version: 'v2.4', changes: 'Watchlist zobrazuje všechny naskladněné kvality z Najády (dříve jen jedna), řazeno od nejlevnější' },
+  { version: 'v2.3', changes: 'Dropdown edic ve watchlistu seřazen abecedně' },
+  { version: 'v2.2', changes: 'Rozšíření edic: Alpha, Beta, Unlimited, 3rd Edition, Arabian Nights, Antiquities, Legends, Legends Italian, The Dark, Fallen Empires, Asian BB, FBB' },
+  { version: 'v2.1', changes: 'Najáda přidána do watchlistu – refresh aktualizuje ceny z obou shopů, tabulka rozšířena o CR a Najáda sloupce' },
+  { version: 'v2.0', changes: 'Přidána Najáda do vyhledávání – checkboxy pro výběr shopů, paralelní vyhledávání, nové sloupce Stav a Eshop' },
+  { version: 'v1.0', changes: 'Základ: vyhledávání na Černý Rytíř, filtr Pre-Modern edic (4th Ed – Scourge), watchlist s uložením karet + aktualizací cen' },
+];
+
+app.get('/api/changelog', (_req, res) => res.json(CHANGELOG));
+
+const KNOWN_ISSUES = [
+  { id: 1, severity: 'low',    desc: 'Checkbox v multi-edition pickeru má příliš velkou mezeru od textu edice – kosmetický problém, funkčnost není dotčena' },
+  { id: 2, severity: 'info',   desc: 'Integrace shopu Dobi (Cardmarket / Dobi-trading-DE) čeká na otevření Cardmarket API – momentálně nepřijímají nové žádosti o přístup. Implementace proběhne jakmile API bude dostupné.' },
+];
+
+app.get('/api/known-issues', (_req, res) => res.json(KNOWN_ISSUES));
+
 /* ─── SQLite DB ──────────────────────────────────────────────────────────── */
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -398,6 +423,18 @@ app.post('/api/watchlist/add', requireWatchlist, (req, res) => {
   const id = genId();
   db.prepare('INSERT INTO watchlist_cards (id, watchlist_id, name, edition) VALUES (?, ?, ?, ?)').run(id, req.watchlistId, name.trim(), edition.trim());
   res.json({ id, watchlist_id: req.watchlistId, name: name.trim(), edition: edition.trim(), cr_price: null, cr_quantity: null, najada_articles: [] });
+});
+
+app.post('/api/watchlist/add-bulk', requireWatchlist, (req, res) => {
+  const { name, editions } = req.body || {};
+  if (!name || !Array.isArray(editions) || editions.length === 0)
+    return res.status(400).json({ error: 'Chybí name nebo editions' });
+  const insert = db.prepare('INSERT INTO watchlist_cards (id, watchlist_id, name, edition) VALUES (?, ?, ?, ?)');
+  for (const edition of editions) {
+    if (!edition) continue;
+    insert.run(genId(), req.watchlistId, name.trim(), edition.trim());
+  }
+  res.json({ list: dbCardsToList(db.prepare('SELECT * FROM watchlist_cards WHERE watchlist_id = ? ORDER BY rowid').all(req.watchlistId)) });
 });
 
 app.post('/api/watchlist/import', requireWatchlist, (req, res) => {
