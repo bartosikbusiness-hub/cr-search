@@ -26,6 +26,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 /* ─── Changelog ──────────────────────────────────────────────────────────── */
 
 const CHANGELOG = [
+  { version: 'v3.5', changes: 'Zelené zvýraznění dostupných karet sjednoceno – funguje nyní i ve výsledcích vyhledávání, nejen ve watchlistu' },
   { version: 'v3.4', changes: 'Aplikace přejmenována na Premodern; sekce O aplikaci (🧙); Known Issues a Changelog dostupné i v admin panelu' },
   { version: 'v3.3', changes: 'Admin panel: zobrazení plaintext hesla watchlistu – sloupec Heslo vedle ID hashe' },
   { version: 'v3.2', changes: 'Zobrazení jména watchlistu vedle Odhlásit – skryté pod tečkami, kliknutím se odhalí na 3 s; multi-edition picker; Known Issues sekce v hlavičce' },

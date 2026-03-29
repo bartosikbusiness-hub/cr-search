@@ -883,7 +883,8 @@
         const condTag = c.condition && c.condition !== '–'
           ? `<span class="cond cond-${c.condition}">${esc(c.condition)}</span>`
           : `<span class="cond">–</span>`;
-        return `<tr>
+        const rowClass = c.quantity > 0 ? ' class="in-stock"' : '';
+        return `<tr${rowClass}>
           <td class="col-num">${i + 1}</td>
           <td class="col-name">${esc(c.name)}</td>
           <td class="col-edition">${esc(c.edition)}</td>
