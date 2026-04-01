@@ -312,11 +312,14 @@
 
     /* ── Qty input (watchlist) ── */
     .qty-input {
-      width: 3.5rem; padding: .25rem .4rem;
+      width: 2.4rem; padding: .25rem .3rem;
       font-size: .85rem; text-align: center;
       background: var(--bg); border: 1px solid var(--border);
       border-radius: 4px; color: var(--text); flex: none;
+      -moz-appearance: textfield;
     }
+    .qty-input::-webkit-outer-spin-button,
+    .qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     .qty-input:focus { border-color: var(--glow); outline: none; }
 
     /* ── Add-to-watchlist button in search ── */
@@ -683,6 +686,7 @@
       <thead>
         <tr>
           <th class="col-num">#</th>
+          <th title="Kolik kusů potřebuješ">Počet</th>
           <th>Název</th>
           <th>Edice</th>
           <th><span class="badge-cr">CR</span> Cena</th>
@@ -690,7 +694,6 @@
           <th><span class="badge-najada">NJ</span> Stav</th>
           <th><span class="badge-najada">NJ</span> Cena</th>
           <th><span class="badge-najada">NJ</span> Sklad</th>
-          <th title="Kolik kusů potřebuješ">Potřebuji</th>
           <th class="col-action"></th>
         </tr>
       </thead>
@@ -924,7 +927,7 @@
         const rowClass = c.quantity > 0 ? ' class="in-stock"' : '';
         return `<tr${rowClass}>
           <td class="col-num">${i + 1}</td>
-          <td class="col-name" data-card-name="${esc(c.name)}">${esc(c.name)}</td>
+          <td class="col-name" data-card-name="${esc(c.name)}" data-card-edition="${esc(c.edition)}">${esc(c.name)}</td>
           <td class="col-edition">${esc(c.edition)}</td>
           <td>${condTag}</td>
           <td class="col-price">${fmt(c.price)}</td>
@@ -1064,14 +1067,14 @@
 
       return `<tr${rowClass}>
         <td class="col-num">${i + 1}</td>
-        <td class="col-name" data-card-name="${esc(e.name)}">${esc(e.name)}</td>
+        <td><input type="number" class="qty-input" value="${e.qty_needed || 1}" min="1" max="99" maxlength="2" onchange="updateQtyNeeded('${e.id}', +this.value)" oninput="if(this.value.length>2)this.value=this.value.slice(0,2)"></td>
+        <td class="col-name" data-card-name="${esc(e.name)}" data-card-edition="${esc(e.edition)}">${esc(e.name)}</td>
         <td class="col-edition">${esc(e.edition)}</td>
         <td>${crPriceCell}</td>
         <td class="col-qty">${crQtyCell}</td>
         <td>${njCondCell}</td>
         <td>${njPriceCell}</td>
         <td class="col-qty">${njQtyCell}</td>
-        <td><input type="number" class="qty-input" value="${e.qty_needed || 1}" min="1" onchange="updateQtyNeeded('${e.id}', +this.value)"></td>
         <td class="col-action"><button class="btn-remove" title="Odebrat" onclick="removeFromWatchlist('${e.id}')">✕</button></td>
       </tr>`;
     }).join('');
@@ -1115,6 +1118,23 @@
   const _imgCache = new Map();
   let _hoverTimer = null;
   let _hoverEl    = null;
+  let EDITION_TO_SET = null; // builduje se lazy až po inicializaci SET_CODE_MAP
+
+  function getEditionToSet() {
+    if (EDITION_TO_SET) return EDITION_TO_SET;
+    EDITION_TO_SET = {};
+    for (const [code, name] of Object.entries(SET_CODE_MAP)) {
+      if (!EDITION_TO_SET[name]) EDITION_TO_SET[name] = code.toLowerCase();
+    }
+    EDITION_TO_SET['Revised']                = '3ed';
+    EDITION_TO_SET['Alpha']                  = 'lea';
+    EDITION_TO_SET['Beta']                   = 'leb';
+    EDITION_TO_SET['Unlimited']              = '2ed';
+    EDITION_TO_SET['Legends Italian']        = 'lig';
+    EDITION_TO_SET['Asian Black Bordered']   = 'rin';
+    EDITION_TO_SET['Foreign Black Bordered'] = 'fbb';
+    return EDITION_TO_SET;
+  }
 
   function getHoverEl() {
     if (!_hoverEl) {
@@ -1129,17 +1149,28 @@
   document.addEventListener('mouseover', async e => {
     const cell = e.target.closest('[data-card-name]');
     if (!cell) return;
-    const name = cell.dataset.cardName;
+    const name    = cell.dataset.cardName;
+    const edition = cell.dataset.cardEdition || '';
+    const setCode = getEditionToSet()[edition] || '';
+    const cacheKey = `${name}|${setCode}`;
     clearTimeout(_hoverTimer);
     _hoverTimer = setTimeout(async () => {
-      let url = _imgCache.get(name);
+      let url = _imgCache.get(cacheKey);
       if (!url) {
         try {
-          const r = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`);
-          if (!r.ok) return;
-          const d = await r.json();
-          url = d.image_uris?.normal || d.card_faces?.[0]?.image_uris?.normal;
-          if (url) _imgCache.set(name, url);
+          const setParam = setCode ? `&set=${setCode}` : '';
+          const r = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}${setParam}`);
+          if (!r.ok) {
+            // Fallback bez set kódu
+            const r2 = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`);
+            if (!r2.ok) return;
+            const d2 = await r2.json();
+            url = d2.image_uris?.normal || d2.card_faces?.[0]?.image_uris?.normal;
+          } else {
+            const d = await r.json();
+            url = d.image_uris?.normal || d.card_faces?.[0]?.image_uris?.normal;
+          }
+          if (url) _imgCache.set(cacheKey, url);
         } catch { return; }
       }
       if (!url) return;

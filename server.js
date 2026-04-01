@@ -6,7 +6,7 @@ const express      = require('express');
 const path         = require('path');
 const crypto       = require('crypto');
 const fs           = require('fs');
-const { chromium } = require('playwright');
+const { chromium } = require('playwright-core');
 const bcrypt       = require('bcryptjs');
 const jwt          = require('jsonwebtoken');
 const Database     = require('better-sqlite3');
@@ -26,7 +26,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 /* ─── Changelog ──────────────────────────────────────────────────────────── */
 
 const CHANGELOG = [
-  { version: 'v3.6', changes: 'Přidání do watchlistu přímo ze search (+); sloupec Potřebuji ve watchlistu; obrázek karty při hoveru (Scryfall); vylepšená mobilní verze' },
+  { version: 'v3.7', changes: 'playwright → playwright-core: pouze Chromium (~280 MB místo ~900 MB), automatická instalace při deployi přes postinstall; oprava hover náhledu dle edice' },
+  { version: 'v3.6', changes: 'Přidání do watchlistu přímo ze search (+); sloupec Počet ve watchlistu; obrázek karty při hoveru (Scryfall); vylepšená mobilní verze' },
   { version: 'v3.5', changes: 'Zelené zvýraznění dostupných karet sjednoceno – funguje nyní i ve výsledcích vyhledávání, nejen ve watchlistu' },
   { version: 'v3.4', changes: 'Aplikace přejmenována na Premodern; sekce O aplikaci (🧙); Known Issues a Changelog dostupné i v admin panelu' },
   { version: 'v3.3', changes: 'Admin panel: zobrazení plaintext hesla watchlistu – sloupec Heslo vedle ID hashe' },
@@ -50,7 +51,6 @@ const KNOWN_ISSUES = [
   { id: 2, severity: 'info',   desc: 'Integrace shopu Dobi (Cardmarket / Dobi-trading-DE) čeká na otevření Cardmarket API – momentálně nepřijímají nové žádosti o přístup, implementace proběhne jakmile API bude dostupné' },
   { id: 3, severity: 'medium', desc: 'Watchlist refresh pro karty s krátkým názvem (např. "Island") může vrátit i karty jejichž název začíná stejným slovem (např. "Island Fish Jasconius" z Arabian Nights), protože CR embedduje stav do názvu ve formátu "Karta - lightly played" a matching probíhá prefixem.' },
   { id: 4, severity: 'info',   desc: 'bcrypt.compare() při loginu je redundantní – watchlist ID je deterministicky odvozeno ze SHA-256 hesla, takže samotný lookup podle ID již ověřuje znalost hesla. bcryptjs závislost lze odstranit.' },
-  { id: 5, severity: 'info',   desc: 'Playwright package obsahuje bindings pro Chromium, Firefox i WebKit, ale používá se pouze Chromium. Při nasazení nahradit za playwright-core + standalone Chromium (~280 MB místo ~900 MB).' },
 ];
 
 app.get('/api/known-issues', (_req, res) => res.json(KNOWN_ISSUES));
