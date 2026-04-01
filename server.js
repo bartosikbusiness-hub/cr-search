@@ -26,6 +26,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 /* ─── Changelog ──────────────────────────────────────────────────────────── */
 
 const CHANGELOG = [
+  { version: 'v4.0', changes: 'Known Issues přeorganizovány do sekcí dle závažnosti (High / Medium / Low / Info)' },
   { version: 'v3.9', changes: 'Mobilní optimalizace – header tlačítka jen emoji, search bar zalomení, skrytí sloupce #' },
   { version: 'v3.8', changes: 'Vyčištění Known Issues – odstraněny vyřešené záznamy (playwright-core, bcrypt redundance)' },
   { version: 'v3.7', changes: 'playwright → playwright-core: pouze Chromium (~280 MB místo ~900 MB), automatická instalace při deployi přes postinstall; oprava hover náhledu dle edice' },

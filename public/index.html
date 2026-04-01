@@ -485,12 +485,19 @@
     .cl-desc { font-size: .85rem; color: var(--text); line-height: 1.5; }
 
     /* ── Known Issues modal ── */
-    .ki-entry { display:flex; gap:.8rem; align-items:baseline; padding:.6rem 0; border-bottom:1px solid var(--border); }
+    .ki-section { margin-bottom: 1.2rem; }
+    .ki-section:last-child { margin-bottom: 0; }
+    .ki-section-title {
+      font-size: .68rem; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; padding: .25rem .5rem;
+      border-radius: 4px; display: inline-block; margin-bottom: .5rem;
+    }
+    .ki-section-high   .ki-section-title { background:#2a0808; color:var(--red); }
+    .ki-section-medium .ki-section-title { background:#2a1500; color:#e07020; }
+    .ki-section-low    .ki-section-title { background:#2a2a10; color:var(--gold); }
+    .ki-section-info   .ki-section-title { background:#101828; color:#60a0e0; }
+    .ki-entry { display:flex; gap:.8rem; align-items:baseline; padding:.5rem 0; border-bottom:1px solid var(--border); }
     .ki-entry:last-child { border-bottom:none; }
-    .ki-badge { font-size:.72rem; font-weight:700; padding:.15rem .45rem; border-radius:4px; white-space:nowrap; }
-    .ki-low  { background:#2a2a10; color:var(--gold); }
-    .ki-mid  { background:#2a1010; color:#f08040; }
-    .ki-high { background:#2a0808; color:var(--red); }
     .ki-desc { font-size:.85rem; color:var(--text); line-height:1.5; }
 
     /* ── Import modal ── */
@@ -1217,11 +1224,20 @@
     try {
       const data = await fetch('/api/known-issues').then(r => r.json());
       if (!data.length) { body.innerHTML = '<span style="color:var(--green)">✓ Žádné známé problémy.</span>'; return; }
-      body.innerHTML = data.map(e => `
-        <div class="ki-entry">
-          <span class="ki-badge ki-${e.severity}">${e.severity.toUpperCase()}</span>
-          <span class="ki-desc">${esc(e.desc)}</span>
-        </div>`).join('');
+      const order = ['high', 'medium', 'low', 'info'];
+      const labels = { high: '🔴 High', medium: '🟠 Medium', low: '🟡 Low', info: '🔵 Info' };
+      const grouped = {};
+      for (const sev of order) grouped[sev] = data.filter(e => e.severity === sev);
+      body.innerHTML = order
+        .filter(sev => grouped[sev].length > 0)
+        .map(sev => `
+          <div class="ki-section ki-section-${sev}">
+            <div class="ki-section-title">${labels[sev]}</div>
+            ${grouped[sev].map(e => `
+              <div class="ki-entry">
+                <span class="ki-desc">${esc(e.desc)}</span>
+              </div>`).join('')}
+          </div>`).join('');
     } catch { body.innerHTML = '<span style="color:var(--red)">Chyba při načítání.</span>'; }
   }
   function hideKnownIssues() { document.getElementById('ki-overlay').style.display = 'none'; }
