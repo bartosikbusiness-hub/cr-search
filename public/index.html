@@ -310,6 +310,42 @@
     .nj-price { font-family: monospace; font-weight: 700; white-space: nowrap; }
     .nj-qty   { font-family: monospace; font-size: .88rem; white-space: nowrap; }
 
+    /* ── Qty input (watchlist) ── */
+    .qty-input {
+      width: 3.5rem; padding: .25rem .4rem;
+      font-size: .85rem; text-align: center;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 4px; color: var(--text); flex: none;
+    }
+    .qty-input:focus { border-color: var(--glow); outline: none; }
+
+    /* ── Add-to-watchlist button in search ── */
+    .btn-add-wl {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--muted); font-size: .9rem; line-height: 1;
+      padding: .2rem .55rem; border-radius: 4px;
+      cursor: pointer; transition: all .15s; white-space: nowrap;
+    }
+    .btn-add-wl:hover { background: var(--glow); border-color: var(--glow); color: #fff; }
+    .btn-add-wl:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* ── Card image tooltip ── */
+    #card-hover {
+      position: fixed; z-index: 200; pointer-events: none; display: none;
+      filter: drop-shadow(0 8px 24px rgba(0,0,0,.85));
+    }
+    #card-hover img { width: 200px; border-radius: 10px; display: block; }
+
+    /* ── Mobile ── */
+    @media (max-width: 640px) {
+      body { padding: 1rem .5rem 3rem; gap: 1.2rem; }
+      h1 { font-size: 1.2rem; }
+      .watchlist-form { flex-direction: column; }
+      .watchlist-form input, .watchlist-form .edition-picker, .watchlist-form button { width: 100%; }
+      .watchlist-toolbar { flex-direction: column; align-items: flex-start; }
+      .watchlist-toolbar-right { width: 100%; justify-content: space-between; }
+    }
+
     /* ── Auth overlay ── */
     #auth-overlay {
       position  : fixed;
@@ -654,6 +690,7 @@
           <th><span class="badge-najada">NJ</span> Stav</th>
           <th><span class="badge-najada">NJ</span> Cena</th>
           <th><span class="badge-najada">NJ</span> Sklad</th>
+          <th title="Kolik kusů potřebuješ">Potřebuji</th>
           <th class="col-action"></th>
         </tr>
       </thead>
@@ -876,6 +913,7 @@
 
       if (data.count === 0) { out.innerHTML = '<div class="empty">Žádné výsledky.</div>'; return; }
 
+      searchResults = data.cards;
       const rows = data.cards.map((c, i) => {
         const shopBadge = c.shop === 'Najáda'
           ? `<span class="badge-najada">NAJÁDA</span>`
@@ -886,18 +924,19 @@
         const rowClass = c.quantity > 0 ? ' class="in-stock"' : '';
         return `<tr${rowClass}>
           <td class="col-num">${i + 1}</td>
-          <td class="col-name">${esc(c.name)}</td>
+          <td class="col-name" data-card-name="${esc(c.name)}">${esc(c.name)}</td>
           <td class="col-edition">${esc(c.edition)}</td>
           <td>${condTag}</td>
           <td class="col-price">${fmt(c.price)}</td>
           <td class="col-qty ${qtyClass(c.quantity)}">${c.quantity} ks</td>
           <td>${shopBadge}</td>
+          <td class="col-action"><button class="btn-add-wl" onclick="addFromSearch(${i}, this)" title="Přidat do watchlistu">+</button></td>
         </tr>`;
       }).join('');
 
       out.innerHTML = `<table>
         <thead><tr>
-          <th class="col-num">#</th><th>Název</th><th>Edice</th><th>Stav</th><th>Cena</th><th>Sklad</th><th>Eshop</th>
+          <th class="col-num">#</th><th>Název</th><th>Edice</th><th>Stav</th><th>Cena</th><th>Sklad</th><th>Eshop</th><th class="col-action"></th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
@@ -954,7 +993,7 @@
     btn.textContent = '↻ Aktualizuji…';
     info.textContent = 'Načítám ceny ze serveru…';
     document.getElementById('wl-body').innerHTML =
-      '<tr class="spinner-row"><td colspan="9"><div class="spinner"></div></td></tr>';
+      '<tr class="spinner-row"><td colspan="10"><div class="spinner"></div></td></tr>';
 
     try {
       const res  = await fetch('/api/watchlist/refresh', { method: 'POST', headers: authHeaders() });
@@ -976,7 +1015,7 @@
   function renderWatchlist(list) {
     const tbody = document.getElementById('wl-body');
     if (!list || list.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" class="empty">Watchlist je prázdný.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" class="empty">Watchlist je prázdný.</td></tr>';
       return;
     }
 
@@ -1025,17 +1064,99 @@
 
       return `<tr${rowClass}>
         <td class="col-num">${i + 1}</td>
-        <td class="col-name">${esc(e.name)}</td>
+        <td class="col-name" data-card-name="${esc(e.name)}">${esc(e.name)}</td>
         <td class="col-edition">${esc(e.edition)}</td>
         <td>${crPriceCell}</td>
         <td class="col-qty">${crQtyCell}</td>
         <td>${njCondCell}</td>
         <td>${njPriceCell}</td>
         <td class="col-qty">${njQtyCell}</td>
+        <td><input type="number" class="qty-input" value="${e.qty_needed || 1}" min="1" onchange="updateQtyNeeded('${e.id}', +this.value)"></td>
         <td class="col-action"><button class="btn-remove" title="Odebrat" onclick="removeFromWatchlist('${e.id}')">✕</button></td>
       </tr>`;
     }).join('');
   }
+
+  /* ── Add from search ── */
+  let searchResults = [];
+
+  async function addFromSearch(idx, btn) {
+    const c = searchResults[idx];
+    if (!c) return;
+    if (!getToken()) { showAuthModal(); return; }
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/watchlist/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ name: c.name, edition: c.edition }),
+      });
+      if (res.status === 401) { clearToken(); showAuthModal(); btn.disabled = false; return; }
+      const data = await res.json();
+      if (!res.ok) { alert(data.error); btn.disabled = false; return; }
+      btn.textContent = '✓';
+      btn.style.color = 'var(--green)';
+      btn.style.borderColor = 'var(--green)';
+      await loadWatchlist();
+    } catch { btn.disabled = false; }
+  }
+
+  /* ── Qty needed ── */
+  async function updateQtyNeeded(id, qty) {
+    if (!qty || qty < 1) return;
+    await fetch(`/api/watchlist/${id}/qty`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ qty_needed: qty }),
+    });
+  }
+
+  /* ── Scryfall card image hover ── */
+  const _imgCache = new Map();
+  let _hoverTimer = null;
+  let _hoverEl    = null;
+
+  function getHoverEl() {
+    if (!_hoverEl) {
+      _hoverEl = document.createElement('div');
+      _hoverEl.id = 'card-hover';
+      _hoverEl.innerHTML = '<img alt="">';
+      document.body.appendChild(_hoverEl);
+    }
+    return _hoverEl;
+  }
+
+  document.addEventListener('mouseover', async e => {
+    const cell = e.target.closest('[data-card-name]');
+    if (!cell) return;
+    const name = cell.dataset.cardName;
+    clearTimeout(_hoverTimer);
+    _hoverTimer = setTimeout(async () => {
+      let url = _imgCache.get(name);
+      if (!url) {
+        try {
+          const r = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`);
+          if (!r.ok) return;
+          const d = await r.json();
+          url = d.image_uris?.normal || d.card_faces?.[0]?.image_uris?.normal;
+          if (url) _imgCache.set(name, url);
+        } catch { return; }
+      }
+      if (!url) return;
+      const el   = getHoverEl();
+      el.querySelector('img').src = url;
+      const rect = cell.getBoundingClientRect();
+      el.style.top     = Math.max(8, Math.min(rect.top, window.innerHeight - 320)) + 'px';
+      el.style.left    = (rect.right + 12) + 'px';
+      el.style.display = 'block';
+    }, 400);
+  });
+
+  document.addEventListener('mouseout', e => {
+    if (!e.target.closest('[data-card-name]')) return;
+    clearTimeout(_hoverTimer);
+    if (_hoverEl) _hoverEl.style.display = 'none';
+  });
 
   /* ── About modal ── */
   function showAbout() { document.getElementById('about-overlay').classList.remove('hidden'); }

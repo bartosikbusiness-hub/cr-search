@@ -26,6 +26,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 /* ─── Changelog ──────────────────────────────────────────────────────────── */
 
 const CHANGELOG = [
+  { version: 'v3.6', changes: 'Přidání do watchlistu přímo ze search (+); sloupec Potřebuji ve watchlistu; obrázek karty při hoveru (Scryfall); vylepšená mobilní verze' },
   { version: 'v3.5', changes: 'Zelené zvýraznění dostupných karet sjednoceno – funguje nyní i ve výsledcích vyhledávání, nejen ve watchlistu' },
   { version: 'v3.4', changes: 'Aplikace přejmenována na Premodern; sekce O aplikaci (🧙); Known Issues a Changelog dostupné i v admin panelu' },
   { version: 'v3.3', changes: 'Admin panel: zobrazení plaintext hesla watchlistu – sloupec Heslo vedle ID hashe' },
@@ -87,6 +88,7 @@ db.exec(`
 // Migrace – přidej cr_articles sloupec pokud chybí (starší DB)
 try { db.exec('ALTER TABLE watchlist_cards ADD COLUMN cr_articles TEXT'); } catch { /* sloupec již existuje */ }
 try { db.exec('ALTER TABLE watchlists ADD COLUMN password_plain TEXT'); } catch { /* sloupec již existuje */ }
+try { db.exec('ALTER TABLE watchlist_cards ADD COLUMN qty_needed INTEGER DEFAULT 1'); } catch { /* sloupec již existuje */ }
 
 /* ─── Migrace starého watchlist.json → SQLite ────────────────────────────── */
 
@@ -479,6 +481,14 @@ app.post('/api/watchlist/import', requireWatchlist, (req, res) => {
 app.delete('/api/watchlist/all', requireWatchlist, (req, res) => {
   db.prepare('DELETE FROM watchlist_cards WHERE watchlist_id = ?').run(req.watchlistId);
   db.prepare('DELETE FROM watchlists WHERE id = ?').run(req.watchlistId);
+  res.json({ ok: true });
+});
+
+app.patch('/api/watchlist/:id/qty', requireWatchlist, (req, res) => {
+  const qty = parseInt(req.body?.qty_needed, 10);
+  if (!Number.isInteger(qty) || qty < 1) return res.status(400).json({ error: 'Neplatné množství' });
+  db.prepare('UPDATE watchlist_cards SET qty_needed = ? WHERE id = ? AND watchlist_id = ?')
+    .run(qty, req.params.id, req.watchlistId);
   res.json({ ok: true });
 });
 
