@@ -339,14 +339,31 @@
     }
     #card-hover img { width: 200px; border-radius: 10px; display: block; }
 
+    /* ── Header buttons ── */
+    .btn-header {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--muted); font-size: .78rem; padding: .3rem .7rem;
+      border-radius: 6px; cursor: pointer;
+    }
+    .btn-header:hover { background: var(--border); color: var(--text); }
+
     /* ── Mobile ── */
     @media (max-width: 640px) {
       body { padding: 1rem .5rem 3rem; gap: 1.2rem; }
       h1 { font-size: 1.2rem; }
+      /* Header – jen emoji, bez textu */
+      .btn-label { display: none; }
+      .btn-header { font-size: .9rem; padding: .3rem .5rem; }
+      /* Search bar */
+      .search-bar { flex-wrap: wrap; }
+      .search-bar button { width: 100%; }
+      /* Watchlist form */
       .watchlist-form { flex-direction: column; }
       .watchlist-form input, .watchlist-form .edition-picker, .watchlist-form button { width: 100%; }
       .watchlist-toolbar { flex-direction: column; align-items: flex-start; }
       .watchlist-toolbar-right { width: 100%; justify-content: space-between; }
+      /* Tabulky – skryj sloupec # */
+      .col-num { display: none; }
     }
 
     /* ── Auth overlay ── */
@@ -631,12 +648,12 @@
   </div>
 </div>
 
-<div style="width:100%;max-width:900px;display:flex;align-items:center;justify-content:space-between;gap:1rem">
+<div style="width:100%;max-width:900px;display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap">
   <h1>Premodern</h1>
-  <div style="display:flex;gap:.4rem;flex-shrink:0">
-    <button onclick="showAbout()"       style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:.78rem;padding:.3rem .7rem;border-radius:6px;cursor:pointer" title="O aplikaci">🧙 O aplikaci</button>
-    <button onclick="showKnownIssues()" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:.78rem;padding:.3rem .7rem;border-radius:6px;cursor:pointer" title="Známé problémy">🐛 Known issues</button>
-    <button onclick="showChangelog()"   style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:.78rem;padding:.3rem .7rem;border-radius:6px;cursor:pointer" title="Verze a changelog">📋 Changelog</button>
+  <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+    <button onclick="showAbout()"       class="btn-header" title="O aplikaci">🧙 <span class="btn-label">O aplikaci</span></button>
+    <button onclick="showKnownIssues()" class="btn-header" title="Známé problémy">🐛 <span class="btn-label">Known issues</span></button>
+    <button onclick="showChangelog()"   class="btn-header" title="Changelog">📋 <span class="btn-label">Changelog</span></button>
   </div>
 </div>
 

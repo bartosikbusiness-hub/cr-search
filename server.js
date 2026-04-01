@@ -26,6 +26,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 /* ─── Changelog ──────────────────────────────────────────────────────────── */
 
 const CHANGELOG = [
+  { version: 'v3.9', changes: 'Mobilní optimalizace – header tlačítka jen emoji, search bar zalomení, skrytí sloupce #' },
   { version: 'v3.8', changes: 'Vyčištění Known Issues – odstraněny vyřešené záznamy (playwright-core, bcrypt redundance)' },
   { version: 'v3.7', changes: 'playwright → playwright-core: pouze Chromium (~280 MB místo ~900 MB), automatická instalace při deployi přes postinstall; oprava hover náhledu dle edice' },
   { version: 'v3.6', changes: 'Přidání do watchlistu přímo ze search (+); sloupec Počet ve watchlistu; obrázek karty při hoveru (Scryfall); vylepšená mobilní verze' },
@@ -51,6 +52,7 @@ const KNOWN_ISSUES = [
   { id: 1, severity: 'low',    desc: 'Checkbox v multi-edition pickeru má příliš velkou mezeru od textu edice – kosmetický problém, funkčnost není dotčena' },
   { id: 2, severity: 'info',   desc: 'Integrace shopu Dobi (Cardmarket / Dobi-trading-DE) čeká na otevření Cardmarket API – momentálně nepřijímají nové žádosti o přístup, implementace proběhne jakmile API bude dostupné' },
   { id: 3, severity: 'medium', desc: 'Watchlist refresh pro karty s krátkým názvem (např. "Island") může vrátit i karty jejichž název začíná stejným slovem (např. "Island Fish Jasconius" z Arabian Nights), protože CR embedduje stav do názvu ve formátu "Karta - lightly played" a matching probíhá prefixem.' },
+  { id: 5, severity: 'low',    desc: 'Mobilní UX – tabulky s mnoha sloupci nejsou na malých displejích optimální, vhodná další UX optimalizace (skrývání méně důležitých sloupců, responzivní layout).' },
 ];
 
 app.get('/api/known-issues', (_req, res) => res.json(KNOWN_ISSUES));
