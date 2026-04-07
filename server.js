@@ -6,7 +6,7 @@ const express      = require('express');
 const path         = require('path');
 const crypto       = require('crypto');
 const fs           = require('fs');
-const { chromium } = require('playwright-core');
+const cheerio      = require('cheerio');
 const bcrypt       = require('bcryptjs');
 const jwt          = require('jsonwebtoken');
 const Database     = require('better-sqlite3');
@@ -26,6 +26,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 /* ─── Changelog ──────────────────────────────────────────────────────────── */
 
 const CHANGELOG = [
+  { version: 'v4.1', changes: 'CR scraper přepsán z Playwright/Chromium na fetch + cheerio – eliminace 290 MB browser binárky, podpora free hostingu, rychlejší start' },
   { version: 'v4.0', changes: 'Known Issues přeorganizovány do sekcí dle závažnosti (High / Medium / Low / Info)' },
   { version: 'v3.9', changes: 'Mobilní optimalizace – header tlačítka jen emoji, search bar zalomení, skrytí sloupce #' },
   { version: 'v3.8', changes: 'Vyčištění Known Issues – odstraněny vyřešené záznamy (playwright-core, bcrypt redundance)' },
@@ -219,79 +220,82 @@ function isPremodern(edition) {
 
 /* ─── CR scraper ─────────────────────────────────────────────────────────── */
 
-function extractCardsFromPage(page) {
-  return page.evaluate(() => {
-    const allRows = Array.from(document.querySelectorAll('tr'));
-    const cards   = [];
-
-    // New CR structure (2026):
-    //   row A (3 cells): card name in cells[1]
-    //   row B (2 cells): edition in cells[0], card type in cells[1]
-    //   row C (4 cells): rarity in cells[0], qty in cells[1], price in cells[2]
-    let pendingName    = null;
-    let currentName    = '';
-    let currentEdition = '–';
-
-    for (let i = 0; i < allRows.length; i++) {
-      const cells = Array.from(allRows[i].querySelectorAll('td'));
-
-      // Row A – card name
-      if (cells.length === 3) {
-        const t = (cells[1].innerText || '').replace(/\s+/g, ' ').trim();
-        if (t && t.length > 1 && t.length <= 100) pendingName = t;
-        continue;
-      }
-
-      // Row B – edition (only valid when following a name row)
-      if (cells.length === 2 && pendingName !== null) {
-        const ed = (cells[0].innerText || '').replace(/\s+/g, ' ').trim();
-        if (ed && ed.length > 1 && ed.length <= 80) {
-          currentName    = pendingName;
-          currentEdition = ed;
-        }
-        pendingName = null;
-        continue;
-      }
-
-      // Any non-2-cell row resets pendingName
-      if (cells.length !== 2) pendingName = null;
-
-      // Row C – price / qty
-      if (cells.length !== 4) continue;
-      const rowText = allRows[i].innerText || '';
-      if (!rowText.includes('Kč') || !rowText.includes('ks')) continue;
-
-      const priceM = (cells[2].innerText || '').match(/([\d\s]+)\s*Kč/);
-      if (!priceM) continue;
-      const price = parseInt(priceM[1].replace(/\s/g, ''), 10);
-      if (!price) continue;
-
-      const qtyM    = (cells[1].innerText || '').match(/(\d+)\s*ks/i);
-      const quantity = qtyM ? parseInt(qtyM[1], 10) : 0;
-
-      if (!currentName) continue;
-      cards.push({ name: currentName, edition: currentEdition, price, quantity });
-    }
-
-    return cards;
-  });
+async function fetchCRPage(url) {
+  const resp = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+  if (!resp.ok) throw new Error(`CR vrátil HTTP ${resp.status}`);
+  const buf = await resp.arrayBuffer();
+  return new TextDecoder('windows-1250').decode(Buffer.from(buf));
 }
 
-async function searchAllPages(page, q, maxPages = Infinity, sortBy = 'ceny') {
+function extractCardsFromHTML(html) {
+  const $       = cheerio.load(html);
+  const allRows = $('tr').toArray();
+  const cards   = [];
+
+  // CR structure (2026):
+  //   row A (3 cells): card name in cells[1]
+  //   row B (2 cells): edition in cells[0], card type in cells[1]
+  //   row C (4 cells): rarity in cells[0], qty in cells[1], price in cells[2]
+  let pendingName    = null;
+  let currentName    = '';
+  let currentEdition = '–';
+
+  for (let i = 0; i < allRows.length; i++) {
+    const cells = $(allRows[i]).find('td').toArray();
+
+    // Row A – card name
+    if (cells.length === 3) {
+      const t = $(cells[1]).text().replace(/\s+/g, ' ').trim();
+      if (t && t.length > 1 && t.length <= 100) pendingName = t;
+      continue;
+    }
+
+    // Row B – edition (only valid when following a name row)
+    if (cells.length === 2 && pendingName !== null) {
+      const ed = $(cells[0]).text().replace(/\s+/g, ' ').trim();
+      if (ed && ed.length > 1 && ed.length <= 80) {
+        currentName    = pendingName;
+        currentEdition = ed;
+      }
+      pendingName = null;
+      continue;
+    }
+
+    // Any non-2-cell row resets pendingName
+    if (cells.length !== 2) pendingName = null;
+
+    // Row C – price / qty
+    if (cells.length !== 4) continue;
+    const rowText = $(allRows[i]).text();
+    if (!rowText.includes('Kč') || !rowText.includes('ks')) continue;
+
+    const priceM = $(cells[2]).text().match(/([\d\s]+)\s*Kč/);
+    if (!priceM) continue;
+    const price = parseInt(priceM[1].replace(/\s/g, ''), 10);
+    if (!price) continue;
+
+    const qtyM    = $(cells[1]).text().match(/(\d+)\s*ks/i);
+    const quantity = qtyM ? parseInt(qtyM[1], 10) : 0;
+
+    if (!currentName) continue;
+    cards.push({ name: currentName, edition: currentEdition, price, quantity });
+  }
+
+  return cards;
+}
+
+async function searchAllPages(q, maxPages = Infinity, sortBy = 'ceny') {
   const PAGE_SIZE = 30;
   const firstUrl  = `https://www.cernyrytir.cz/index.php3?akce=3&jmenokarty=${encodeURIComponent(q)}&edice_magic=0&triditpodle=${sortBy}&submit=Vyhledej`;
-  await page.goto(firstUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+  const firstHtml = await fetchCRPage(firstUrl);
 
-  const totalCount = await page.evaluate(() => {
-    const m = document.body.innerText.match(/Nalezeno\s+(\d+)/);
-    return m ? parseInt(m[1], 10) : 0;
-  });
-
+  const totalMatch = firstHtml.match(/Nalezeno\s+(\d+)/);
+  const totalCount = totalMatch ? parseInt(totalMatch[1], 10) : 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   const allCards   = [];
   const seen       = new Set();
 
-  for (const c of await extractCardsFromPage(page)) {
+  for (const c of extractCardsFromHTML(firstHtml)) {
     const key = `${c.name}|${c.edition}|${c.price}`;
     if (!seen.has(key)) { seen.add(key); allCards.push(c); }
   }
@@ -299,9 +303,8 @@ async function searchAllPages(page, q, maxPages = Infinity, sortBy = 'ceny') {
   for (let p = 2; p <= Math.min(totalPages, maxPages); p++) {
     const offset  = (p - 1) * PAGE_SIZE;
     const nextUrl = `https://www.cernyrytir.cz/index.php3?akce=3&limit=${offset}&jmenokarty=${encodeURIComponent(q)}&edice_magic=libovolna&poczob=${PAGE_SIZE}&triditpodle=${sortBy}&hledej_pouze_magic=1&submit=Vyhledej`;
-    await page.goto(nextUrl, { waitUntil: 'domcontentloaded', timeout: 20_000 });
-
-    for (const c of await extractCardsFromPage(page)) {
+    const html    = await fetchCRPage(nextUrl);
+    for (const c of extractCardsFromHTML(html)) {
       const key = `${c.name}|${c.edition}|${c.price}`;
       if (!seen.has(key)) { seen.add(key); allCards.push(c); }
     }
@@ -358,16 +361,8 @@ app.get('/api/search', async (req, res) => {
 
   if (shops.includes('cr')) {
     tasks.push((async () => {
-      let browser;
-      try {
-        browser = await chromium.launch({ headless: true });
-        const ctx  = await browser.newContext({ userAgent: USER_AGENT });
-        const page = await ctx.newPage();
-        const all  = await searchAllPages(page, q);
-        return all.filter(c => isPremodern(c.edition)).map(c => ({ ...c, condition: '–', shop: 'Černý Rytíř' }));
-      } finally {
-        if (browser) await browser.close();
-      }
+      const all = await searchAllPages(q);
+      return all.filter(c => isPremodern(c.edition)).map(c => ({ ...c, condition: '–', shop: 'Černý Rytíř' }));
     })());
   }
 
@@ -506,11 +501,7 @@ app.post('/api/watchlist/refresh', requireWatchlist, async (req, res) => {
 
   const najadaSettled = await Promise.allSettled(rows.map(r => searchNajada(r.name)));
 
-  let browser;
   try {
-    browser = await chromium.launch({ headless: true });
-    const ctx        = await browser.newContext({ userAgent: USER_AGENT });
-    const page       = await ctx.newPage();
     const updateCard = db.prepare(
       'UPDATE watchlist_cards SET cr_price=?, cr_quantity=?, cr_articles=?, najada_articles=?, last_updated=? WHERE id=?'
     );
@@ -535,7 +526,7 @@ app.post('/api/watchlist/refresh', requireWatchlist, async (req, res) => {
 
       let cr_price = null, cr_quantity = null, cr_articles = [];
       try {
-        const crAll     = await searchAllPages(page, row.name, 8, 'jmeno');
+        const crAll     = await searchAllPages(row.name, 8, 'jmeno');
         const crMatched = crAll.filter(c => nameMatch(c) && edMatch(c))
                                .sort((a, b) => a.price - b.price);
         cr_articles = crMatched.map(a => ({ name: a.name, price: a.price, quantity: a.quantity }));
@@ -566,8 +557,6 @@ app.post('/api/watchlist/refresh', requireWatchlist, async (req, res) => {
   } catch (err) {
     console.error('[refresh] Chyba:', err.message);
     res.status(500).json({ error: err.message });
-  } finally {
-    if (browser) await browser.close();
   }
 });
 
