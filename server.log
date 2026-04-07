@@ -1,0 +1,5 @@
+[dotenv@17.3.1] injecting env (4) from .env -- tip: ⚙️  override existing env vars with { override: true }
+
+🔍  CR Search  →  http://localhost:3000
+🔧  Admin      →  http://localhost:3000/admin.html
+
