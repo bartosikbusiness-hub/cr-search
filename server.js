@@ -6,10 +6,11 @@ const express      = require('express');
 const path         = require('path');
 const crypto       = require('crypto');
 const fs           = require('fs');
-const cheerio      = require('cheerio');
 const bcrypt       = require('bcryptjs');
 const jwt          = require('jsonwebtoken');
 const Database     = require('better-sqlite3');
+
+const { searchCardCR } = require('./cr-api');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -26,6 +27,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 /* ─── Changelog ──────────────────────────────────────────────────────────── */
 
 const CHANGELOG = [
+  { version: 'v4.2', changes: 'Černý Rytíř spustil nový web – CR modul přepsán na jeho veřejné API, reálné kvality NM/LP/PL, opraven Island bug' },
   { version: 'v4.1', changes: 'CR scraper přepsán z Playwright/Chromium na fetch + cheerio – eliminace 290 MB browser binárky, podpora free hostingu, rychlejší start' },
   { version: 'v4.0', changes: 'Known Issues přeorganizovány do sekcí dle závažnosti (High / Medium / Low / Info)' },
   { version: 'v3.9', changes: 'Mobilní optimalizace – header tlačítka jen emoji, search bar zalomení, skrytí sloupce #' },
@@ -53,7 +55,6 @@ app.get('/api/changelog', (_req, res) => res.json(CHANGELOG));
 const KNOWN_ISSUES = [
   { id: 1, severity: 'low',    desc: 'Checkbox v multi-edition pickeru má příliš velkou mezeru od textu edice – kosmetický problém, funkčnost není dotčena' },
   { id: 2, severity: 'info',   desc: 'Integrace shopu Dobi (Cardmarket / Dobi-trading-DE) čeká na otevření Cardmarket API – momentálně nepřijímají nové žádosti o přístup, implementace proběhne jakmile API bude dostupné' },
-  { id: 3, severity: 'medium', desc: 'Watchlist refresh pro karty s krátkým názvem (např. "Island") může vrátit i karty jejichž název začíná stejným slovem (např. "Island Fish Jasconius" z Arabian Nights), protože CR embedduje stav do názvu ve formátu "Karta - lightly played" a matching probíhá prefixem.' },
   { id: 5, severity: 'low',    desc: 'Mobilní UX – tabulky s mnoha sloupci nejsou na malých displejích optimální, vhodná další UX optimalizace (skrývání méně důležitých sloupců, responzivní layout).' },
 ];
 
@@ -218,99 +219,28 @@ function isPremodern(edition) {
   });
 }
 
-/* ─── CR scraper ─────────────────────────────────────────────────────────── */
+/* ─── Černý Rytíř – veřejné API (v4.2) ───────────────────────────────────── */
 
-async function fetchCRPage(url) {
-  const resp = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
-  if (!resp.ok) throw new Error(`CR vrátil HTTP ${resp.status}`);
-  const buf = await resp.arrayBuffer();
-  return new TextDecoder('windows-1250').decode(Buffer.from(buf));
-}
-
-function extractCardsFromHTML(html) {
-  const $       = cheerio.load(html);
-  const allRows = $('tr').toArray();
-  const cards   = [];
-
-  // CR structure (2026):
-  //   row A (3 cells): card name in cells[1]
-  //   row B (2 cells): edition in cells[0], card type in cells[1]
-  //   row C (4 cells): rarity in cells[0], qty in cells[1], price in cells[2]
-  let pendingName    = null;
-  let currentName    = '';
-  let currentEdition = '–';
-
-  for (let i = 0; i < allRows.length; i++) {
-    const cells = $(allRows[i]).find('td').toArray();
-
-    // Row A – card name
-    if (cells.length === 3) {
-      const t = $(cells[1]).text().replace(/\s+/g, ' ').trim();
-      if (t && t.length > 1 && t.length <= 100) pendingName = t;
-      continue;
-    }
-
-    // Row B – edition (only valid when following a name row)
-    if (cells.length === 2 && pendingName !== null) {
-      const ed = $(cells[0]).text().replace(/\s+/g, ' ').trim();
-      if (ed && ed.length > 1 && ed.length <= 80) {
-        currentName    = pendingName;
-        currentEdition = ed;
-      }
-      pendingName = null;
-      continue;
-    }
-
-    // Any non-2-cell row resets pendingName
-    if (cells.length !== 2) pendingName = null;
-
-    // Row C – price / qty
-    if (cells.length !== 4) continue;
-    const rowText = $(allRows[i]).text();
-    if (!rowText.includes('Kč') || !rowText.includes('ks')) continue;
-
-    const priceM = $(cells[2]).text().match(/([\d\s]+)\s*Kč/);
-    if (!priceM) continue;
-    const price = parseInt(priceM[1].replace(/\s/g, ''), 10);
-    if (!price) continue;
-
-    const qtyM    = $(cells[1]).text().match(/(\d+)\s*ks/i);
-    const quantity = qtyM ? parseInt(qtyM[1], 10) : 0;
-
-    if (!currentName) continue;
-    cards.push({ name: currentName, edition: currentEdition, price, quantity });
-  }
-
-  return cards;
-}
-
-async function searchAllPages(q, maxPages = Infinity, sortBy = 'ceny') {
-  const PAGE_SIZE = 30;
-  const firstUrl  = `https://www.cernyrytir.cz/index.php3?akce=3&jmenokarty=${encodeURIComponent(q)}&edice_magic=0&triditpodle=${sortBy}&submit=Vyhledej`;
-  const firstHtml = await fetchCRPage(firstUrl);
-
-  const totalMatch = firstHtml.match(/Nalezeno\s+(\d+)/);
-  const totalCount = totalMatch ? parseInt(totalMatch[1], 10) : 0;
-  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
-  const allCards   = [];
-  const seen       = new Set();
-
-  for (const c of extractCardsFromHTML(firstHtml)) {
-    const key = `${c.name}|${c.edition}|${c.price}`;
-    if (!seen.has(key)) { seen.add(key); allCards.push(c); }
-  }
-
-  for (let p = 2; p <= Math.min(totalPages, maxPages); p++) {
-    const offset  = (p - 1) * PAGE_SIZE;
-    const nextUrl = `https://www.cernyrytir.cz/index.php3?akce=3&limit=${offset}&jmenokarty=${encodeURIComponent(q)}&edice_magic=libovolna&poczob=${PAGE_SIZE}&triditpodle=${sortBy}&hledej_pouze_magic=1&submit=Vyhledej`;
-    const html    = await fetchCRPage(nextUrl);
-    for (const c of extractCardsFromHTML(html)) {
-      const key = `${c.name}|${c.edition}|${c.price}`;
-      if (!seen.has(key)) { seen.add(key); allCards.push(c); }
-    }
-  }
-
-  return allCards;
+/**
+ * Vyhledá kartu na Černém Rytíři přes jeho veřejné API (modul cr-api.js)
+ * a vrátí ploché varianty připravené pro frontend.
+ *
+ * @param {string}  q                  – hledaný název karty
+ * @param {boolean} [opts.exactOnly]   – true = jen přesná shoda názvu (watchlist refresh),
+ *                                       false = fuzzy podle podřetězce (vyhledávání)
+ * @returns {Promise<Array<{name:string, edition:string, price:number,
+ *                          quantity:number, condition:string, foil:string}>>}
+ */
+async function searchCR(q, { exactOnly = false } = {}) {
+  const variants = await searchCardCR(q, { exactOnly });
+  return variants.map(v => ({
+    name     : v.name,
+    edition  : v.edition,
+    price    : v.price,
+    quantity : v.stock,
+    condition: v.condition || '–',   // NM / LP / PL
+    foil     : v.foil || 'REGULAR',  // REGULAR / FOIL / ETCHED
+  }));
 }
 
 /* ─── Najada API ─────────────────────────────────────────────────────────── */
@@ -361,8 +291,9 @@ app.get('/api/search', async (req, res) => {
 
   if (shops.includes('cr')) {
     tasks.push((async () => {
-      const all = await searchAllPages(q);
-      return all.filter(c => isPremodern(c.edition)).map(c => ({ ...c, condition: '–', shop: 'Černý Rytíř' }));
+      const all = await searchCR(q, { exactOnly: false });   // fuzzy – API hledá podle podřetězce
+      return all.filter(c => isPremodern(c.edition))
+                .map(c => ({ ...c, shop: 'Černý Rytíř' }));
     })());
   }
 
@@ -507,29 +438,23 @@ app.post('/api/watchlist/refresh', requireWatchlist, async (req, res) => {
     );
 
     for (let i = 0; i < rows.length; i++) {
-      const row      = rows[i];
-      const entryEd  = normalizeApos(row.edition).toLowerCase();
-      const baseName = normalizeApos(row.name).toLowerCase().trim();
+      const row     = rows[i];
+      const entryEd = normalizeApos(row.edition).toLowerCase();
 
       const edMatch = c => {
         const cardEd = normalizeApos(c.edition).toLowerCase();
         return cardEd.includes(entryEd) || entryEd.includes(cardEd);
       };
 
-      // CR název musí být přesně baseName nebo baseName + " - <condition>"
-      const nameMatch = c => {
-        const cn = normalizeApos(c.name).toLowerCase();
-        if (!cn.startsWith(baseName)) return false;
-        if (cn.length === baseName.length) return true;       // přesná shoda
-        return cn.slice(baseName.length).startsWith(' - ');   // jen condition suffix
-      };
-
       let cr_price = null, cr_quantity = null, cr_articles = [];
       try {
-        const crAll     = await searchAllPages(row.name, 8, 'jmeno');
-        const crMatched = crAll.filter(c => nameMatch(c) && edMatch(c))
-                               .sort((a, b) => a.price - b.price);
-        cr_articles = crMatched.map(a => ({ name: a.name, price: a.price, quantity: a.quantity }));
+        // exactOnly = přesná shoda názvu po normalizaci (lowercase, bez "(123)", přední strana DFC)
+        const crAll     = await searchCR(row.name, { exactOnly: true });
+        const crMatched = crAll.filter(edMatch).sort((a, b) => a.price - b.price);
+        cr_articles = crMatched.map(a => ({
+          name: a.name, price: a.price, quantity: a.quantity,
+          condition: a.condition, foil: a.foil,
+        }));
         // Backward compat – ulož i best (první in-stock nebo nejlevnější)
         const best  = crMatched.find(c => c.quantity > 0) || crMatched[0] || null;
         cr_price    = best ? best.price    : null;

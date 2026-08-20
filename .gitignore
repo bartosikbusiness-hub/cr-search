@@ -1,3 +1,14 @@
 node_modules/
 .env
 data/
+.env 
+server.log 
+
+# dev artefakty z reverse-engineeringu CR API (v4.2)
+cr-api-map*.json
+cr-api-response.json
+cr-page-debug*.html
+cr-test-api.js
+map-cr*.js
+map_cr_script.js
+debug_search.js

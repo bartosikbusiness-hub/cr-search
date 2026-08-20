@@ -303,9 +303,19 @@
     }
     .cond-NM { color: var(--green); }
     .cond-LP { color: #a0d060; }
+    .cond-PL { color: var(--gold); }
     .cond-MP { color: var(--gold); }
     .cond-HP { color: #f08040; }
     .cond-D  { color: var(--red); }
+
+    .foil-tag {
+      font-size    : .68rem;
+      font-weight  : 700;
+      padding      : .05rem .25rem;
+      border-radius: 3px;
+      background   : #3a3060;
+      color        : var(--gold);
+    }
 
     .nj-price { font-family: monospace; font-weight: 700; white-space: nowrap; }
     .nj-qty   { font-family: monospace; font-size: .88rem; white-space: nowrap; }
@@ -658,6 +668,8 @@
 <div style="width:100%;max-width:900px;display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap">
   <h1>Premodern</h1>
   <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+    <a href="/wheel.html"   class="btn-header" title="Kolo štěstí" style="text-decoration:none">🎡 <span class="btn-label">Kolo štěstí</span></a>
+    <a href="/proc-ja.html" class="btn-header" title="Kolo neštěstí" style="text-decoration:none">😤 <span class="btn-label">Kolo neštěstí</span></a>
     <button onclick="showAbout()"       class="btn-header" title="O aplikaci">🧙 <span class="btn-label">O aplikaci</span></button>
     <button onclick="showKnownIssues()" class="btn-header" title="Známé problémy">🐛 <span class="btn-label">Known issues</span></button>
     <button onclick="showChangelog()"   class="btn-header" title="Changelog">📋 <span class="btn-label">Changelog</span></button>
@@ -741,6 +753,12 @@
 
   function authHeaders() {
     return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() };
+  }
+
+  const CR_CONDS = ['NM', 'LP', 'PL'];
+  function foilTag(foil) {
+    if (!foil || foil === 'REGULAR') return '';
+    return ' <span class="foil-tag" title="' + esc(foil) + '">' + (foil === 'ETCHED' ? 'E' : 'F') + '</span>';
   }
 
   function qtyClass(q) { return q === 0 ? 'qty-zero' : q <= 3 ? 'qty-low' : 'qty-ok'; }
@@ -945,9 +963,9 @@
         const shopBadge = c.shop === 'Najáda'
           ? `<span class="badge-najada">NAJÁDA</span>`
           : `<span class="badge-cr">CR</span>`;
-        const condTag = c.condition && c.condition !== '–'
+        const condTag = (c.condition && c.condition !== '–'
           ? `<span class="cond cond-${c.condition}">${esc(c.condition)}</span>`
-          : `<span class="cond">–</span>`;
+          : `<span class="cond">–</span>`) + foilTag(c.foil);
         const rowClass = c.quantity > 0 ? ' class="in-stock"' : '';
         return `<tr${rowClass}>
           <td class="col-num">${i + 1}</td>
@@ -1052,9 +1070,15 @@
       let crPriceCell, crQtyCell;
       if (crArticles) {
         crPriceCell = crArticles.map(a => {
-          // Zobraz suffix za base jménem (= stav) + cenu
-          const suffix = a.name.replace(new RegExp('^' + escRe(e.name), 'i'), '').trim().replace(/^-\s*/, '');
-          const label  = suffix ? `<span style="color:var(--muted);font-size:.8em">${esc(suffix)}</span> ` : '';
+          // Stav z API (NM/LP/PL) + foil; u starších záznamů fallback na suffix v názvu
+          const cond  = a.condition && a.condition !== '–'
+            ? a.condition
+            : a.name.replace(new RegExp('^' + escRe(e.name), 'i'), '').trim().replace(/^-s*/, '');
+          const tag   = !cond ? ''
+            : CR_CONDS.includes(cond)
+              ? `<span class="cond cond-${cond}">${cond}</span>`
+              : `<span style="color:var(--muted);font-size:.8em">${esc(cond)}</span>`;
+          const label = (tag || foilTag(a.foil)) ? `${tag}${foilTag(a.foil)} ` : '';
           return `<div>${label}<span class="col-price">${fmt(a.price)}</span></div>`;
         }).join('');
         crQtyCell = crArticles.map(a =>
