@@ -55,6 +55,15 @@ function normalizeName(name) {
     .trim();
 }
 
+/** Lehká normalizace pro hledání fráze: apostrofy, malá písmena, jednoduché mezery. */
+function normalizePhrase(name) {
+  return (name || '')
+    .replace(/[´‘’ʼ`]/g, "'")
+    .toLowerCase()
+    .replace(/s+/g, ' ')
+    .trim();
+}
+
 async function fetchCardListPage(cardName, page) {
   const body = {
     extendedFilter: buildFilter(cardName),
@@ -81,7 +90,8 @@ async function fetchCardListPage(cardName, page) {
  * Vyhledá kartu na Černém Rytíři přes nové API.
  * @param {string} cardName – přesný název karty (např. "Lightning Bolt")
  * @param {object} [opts]
- * @param {boolean} [opts.exactOnly=true] – vrátit jen přesné shody názvu
+ * @param {boolean} [opts.exactOnly=true] – true = jen přesná shoda názvu,
+ *                                          false = názvy obsahující zadání jako frázi
  * @returns {Promise<Array>} pole variant:
  *   { name, edition, editionId, rarity, collectorNumber,
  *     foil: 'REGULAR'|'FOIL'|'ETCHED', condition: 'NM'|'LP'|'PL',
@@ -89,6 +99,7 @@ async function fetchCardListPage(cardName, page) {
  */
 async function searchCardCR(cardName, { exactOnly = true } = {}) {
   const target = normalizeName(cardName);
+  const phrase = normalizePhrase(cardName);
   const results = [];
 
   for (let page = 1; page <= MAX_PAGES; page++) {
@@ -105,7 +116,13 @@ async function searchCardCR(cardName, { exactOnly = true } = {}) {
     if (!list.length) break;
 
     for (const card of list) {
-      if (exactOnly && normalizeName(card.name) !== target) continue;
+      if (exactOnly) {
+        if (normalizeName(card.name) !== target) continue;
+      } else if (!normalizePhrase(card.name).includes(phrase)) {
+        // API hledá po jednotlivých slovech – "lightning bolt" vrátí i Lightning Greaves.
+        // Necháme jen karty, které obsahují zadání jako celou frázi.
+        continue;
+      }
 
       for (const ic of card.internalCards || []) {
         results.push({
@@ -134,7 +151,7 @@ async function searchCardCR(cardName, { exactOnly = true } = {}) {
   return results;
 }
 
-module.exports = { searchCardCR, normalizeName };
+module.exports = { searchCardCR, normalizeName, normalizePhrase };
 
 // ── Samostatný test: node cr-api.js "Název karty" ─────────────────────────
 if (require.main === module) {

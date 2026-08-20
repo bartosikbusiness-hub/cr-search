@@ -317,8 +317,34 @@
       color        : var(--gold);
     }
 
-    .nj-price { font-family: monospace; font-weight: 700; white-space: nowrap; }
-    .nj-qty   { font-family: monospace; font-size: .88rem; white-space: nowrap; }
+    /* ── Nabídky eshopu (jedna buňka = jeden eshop) ── */
+    .offers { display: flex; flex-direction: column; gap: .25rem; }
+    .offer {
+      display              : grid;
+      grid-template-columns: 3.6rem 1fr auto;
+      align-items          : center;
+      gap                  : .6rem;
+      white-space          : nowrap;
+    }
+    .offer-cond  { display: flex; align-items: center; gap: .15rem; }
+    .offer-price { font-family: monospace; font-weight: 700; text-align: right; }
+    .offer-qty   { font-family: monospace; font-size: .82rem; text-align: right; min-width: 3.4rem; }
+    .offer-out             { opacity: .45; }
+    .offer-out .offer-qty  { color: var(--muted); font-weight: 400; }
+    .offer-none  { color: var(--muted); }
+
+    .btn-more {
+      align-self : flex-start;
+      background : transparent;
+      border     : none;
+      color      : var(--muted);
+      font-size  : .74rem;
+      padding    : .1rem 0;
+      cursor     : pointer;
+    }
+    .btn-more:hover { background: transparent; color: var(--text); text-decoration: underline; }
+    .offers-rest.hidden { display: none; }
+    .offers-rest { display: flex; flex-direction: column; gap: .25rem; }
 
     /* ── Qty input (watchlist) ── */
     .qty-input {
@@ -725,16 +751,13 @@
           <th title="Kolik kusů potřebuješ">Počet</th>
           <th>Název</th>
           <th>Edice</th>
-          <th><span class="badge-cr">CR</span> Cena</th>
-          <th><span class="badge-cr">CR</span> Sklad</th>
-          <th><span class="badge-najada">NJ</span> Stav</th>
-          <th><span class="badge-najada">NJ</span> Cena</th>
-          <th><span class="badge-najada">NJ</span> Sklad</th>
+          <th><span class="badge-cr">CR</span> Černý Rytíř</th>
+          <th><span class="badge-najada">NJ</span> Najáda</th>
           <th class="col-action"></th>
         </tr>
       </thead>
       <tbody id="wl-body">
-        <tr><td colspan="9" class="empty">Watchlist je prázdný.</td></tr>
+        <tr><td colspan="7" class="empty">Watchlist je prázdný.</td></tr>
       </tbody>
     </table>
   </div>
@@ -759,6 +782,53 @@
   function foilTag(foil) {
     if (!foil || foil === 'REGULAR') return '';
     return ' <span class="foil-tag" title="' + esc(foil) + '">' + (foil === 'ETCHED' ? 'E' : 'F') + '</span>';
+  }
+
+  /* Jedna nabídka: stav + foil | cena | sklad. Mimo sklad je potlačená. */
+  function offerRow(a) {
+    const cond  = a.condition && a.condition !== '–' ? a.condition : '';
+    const badge = cond
+      ? `<span class="cond${/^[A-Z]{1,2}$/.test(cond) ? ' cond-' + cond : ''}">${esc(cond)}</span>`
+      : '<span class="cond">–</span>';
+    const inStock = a.quantity > 0;
+    const qty = inStock
+      ? `<span class="offer-qty ${qtyClass(a.quantity)}">${a.quantity} ks</span>`
+      : '<span class="offer-qty">není</span>';
+    return `<div class="offer${inStock ? '' : ' offer-out'}">` +
+      `<span class="offer-cond">${badge}${foilTag(a.foil)}</span>` +
+      `<span class="offer-price">${fmt(a.price)}</span>${qty}</div>`;
+  }
+
+  /* Celá buňka eshopu. Co je skladem, je vidět vždy (nejlevnější první);
+     nabídky mimo sklad se sbalí – zůstanou jen dvě nejlevnější jako cenový odhad. */
+  const MAX_SOLD_OUT = 2;
+
+  function shopCell(articles, key) {
+    const list = (articles || []).filter(a => a && a.price != null);
+    if (!list.length) return '<span class="offer-none">–</span>';
+
+    const byPrice = (a, b) => a.price - b.price;
+    const inStock = list.filter(a => a.quantity > 0).sort(byPrice);
+    const soldOut = list.filter(a => !(a.quantity > 0)).sort(byPrice);
+    const ordered = inStock.concat(soldOut);
+
+    const shown = inStock.length || Math.min(soldOut.length, MAX_SOLD_OUT);
+
+    const head = ordered.slice(0, shown).map(offerRow).join('');
+    const rest = ordered.slice(shown);
+    if (!rest.length) return `<div class="offers">${head}</div>`;
+
+    const label = `+ ${rest.length} ${rest.length >= 5 ? 'dalších' : 'další'}`;
+    return `<div class="offers">${head}` +
+      `<div class="offers-rest hidden" id="rest-${key}">${rest.map(offerRow).join('')}</div>` +
+      `<button class="btn-more" data-label="${label}" onclick="toggleOffers('${key}', this)">${label}</button></div>`;
+  }
+
+  function toggleOffers(key, btn) {
+    const box = document.getElementById('rest-' + key);
+    if (!box) return;
+    const hidden = box.classList.toggle('hidden');
+    btn.textContent = hidden ? btn.dataset.label : 'skrýt';
   }
 
   function qtyClass(q) { return q === 0 ? 'qty-zero' : q <= 3 ? 'qty-low' : 'qty-ok'; }
@@ -1038,7 +1108,7 @@
     btn.textContent = '↻ Aktualizuji…';
     info.textContent = 'Načítám ceny ze serveru…';
     document.getElementById('wl-body').innerHTML =
-      '<tr class="spinner-row"><td colspan="10"><div class="spinner"></div></td></tr>';
+      '<tr class="spinner-row"><td colspan="7"><div class="spinner"></div></td></tr>';
 
     try {
       const res  = await fetch('/api/watchlist/refresh', { method: 'POST', headers: authHeaders() });
@@ -1060,69 +1130,27 @@
   function renderWatchlist(list) {
     const tbody = document.getElementById('wl-body');
     if (!list || list.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="10" class="empty">Watchlist je prázdný.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">Watchlist je prázdný.</td></tr>';
       return;
     }
 
     tbody.innerHTML = list.map((e, i) => {
-      // ── CR articles (všechny varianty včetně lightly played apod.)
-      const crArticles = e.cr_articles && e.cr_articles.length > 0 ? e.cr_articles : null;
-      let crPriceCell, crQtyCell;
-      if (crArticles) {
-        crPriceCell = crArticles.map(a => {
-          // Stav z API (NM/LP/PL) + foil; u starších záznamů fallback na suffix v názvu
-          const cond  = a.condition && a.condition !== '–'
-            ? a.condition
-            : a.name.replace(new RegExp('^' + escRe(e.name), 'i'), '').trim().replace(/^-s*/, '');
-          const tag   = !cond ? ''
-            : CR_CONDS.includes(cond)
-              ? `<span class="cond cond-${cond}">${cond}</span>`
-              : `<span style="color:var(--muted);font-size:.8em">${esc(cond)}</span>`;
-          const label = (tag || foilTag(a.foil)) ? `${tag}${foilTag(a.foil)} ` : '';
-          return `<div>${label}<span class="col-price">${fmt(a.price)}</span></div>`;
-        }).join('');
-        crQtyCell = crArticles.map(a =>
-          `<div class="${qtyClass(a.quantity)}">${a.quantity} ks</div>`
-        ).join('');
-      } else if (e.cr_price !== null && e.cr_price !== undefined) {
-        // Fallback na staré jednotlivé pole
-        crPriceCell = `<span class="col-price">${fmt(e.cr_price)}</span>`;
-        crQtyCell   = `<span class="${qtyClass(e.cr_quantity ?? 0)}">${e.cr_quantity ?? 0} ks</span>`;
-      } else {
-        crPriceCell = '–';
-        crQtyCell   = '';
-      }
+      // Novější záznamy mají varianty v cr_articles; starší jen jedno pole cr_price.
+      const crArticles = (e.cr_articles && e.cr_articles.length)
+        ? e.cr_articles
+        : (e.cr_price != null ? [{ price: e.cr_price, quantity: e.cr_quantity ?? 0 }] : []);
+      const njArticles = e.najada_articles || [];
 
-      // ── Najáda articles
-      const articles = e.najada_articles || [];
-      let njCondCell, njPriceCell, njQtyCell;
-      if (articles.length === 0) {
-        njCondCell  = '<span style="color:var(--muted)">–</span>';
-        njPriceCell = '';
-        njQtyCell   = '';
-      } else {
-        njCondCell  = articles.map(a => {
-          const c = a.condition && a.condition !== '–' ? a.condition : '–';
-          return `<div><span class="cond cond-${c}">${esc(c)}</span></div>`;
-        }).join('');
-        njPriceCell = articles.map(a => `<div class="nj-price">${fmt(a.price)}</div>`).join('');
-        njQtyCell   = articles.map(a => `<div class="nj-qty ${qtyClass(a.quantity)}">${a.quantity} ks</div>`).join('');
-      }
-
-      const crInStock     = crArticles ? crArticles.some(a => a.quantity > 0) : (e.cr_quantity ?? 0) > 0;
-      const najadaInStock = articles.some(a => a.quantity > 0);
-      const rowClass      = (crInStock || najadaInStock) ? ' class="in-stock"' : '';
+      const inStock  = crArticles.some(a => a.quantity > 0) || njArticles.some(a => a.quantity > 0);
+      const rowClass = inStock ? ' class="in-stock"' : '';
 
       return `<tr${rowClass}>
         <td class="col-num">${i + 1}</td>
         <td><input type="number" class="qty-input" value="${e.qty_needed || 1}" min="1" max="99" maxlength="2" onchange="updateQtyNeeded('${e.id}', +this.value)" oninput="if(this.value.length>2)this.value=this.value.slice(0,2)"></td>
         <td class="col-name" data-card-name="${esc(e.name)}" data-card-edition="${esc(e.edition)}">${esc(e.name)}</td>
         <td class="col-edition">${esc(e.edition)}</td>
-        <td>${crPriceCell}</td>
-        <td class="col-qty">${crQtyCell}</td>
-        <td>${njCondCell}</td>
-        <td>${njPriceCell}</td>
-        <td class="col-qty">${njQtyCell}</td>
+        <td>${shopCell(crArticles, e.id + '-cr')}</td>
+        <td>${shopCell(njArticles, e.id + '-nj')}</td>
         <td class="col-action"><button class="btn-remove" title="Odebrat" onclick="removeFromWatchlist('${e.id}')">✕</button></td>
       </tr>`;
     }).join('');

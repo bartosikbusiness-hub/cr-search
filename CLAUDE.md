@@ -15,8 +15,10 @@ Vyhledávač premodern MTG karet napříč českými eshopy (Černý Rytíř, Na
 ## Vývoj
 
 ```bash
-npm start          # http://localhost:3000
+node --watch server.js   # http://localhost:3000, restart po každé úpravě
 ```
+
+Na Windows nefunguje `npm run …` v PowerShellu – `npm` je tam skript a systém má spouštění skriptů zakázané (`UnauthorizedAccess`). Proto se server spouští přímo přes `node`, nebo dvojklikem na `start.bat` (běží v cmd). V Git Bashi `npm` funguje normálně.
 
 `.env` podle `.env.example`: `JWT_SECRET`, `ADMIN_PASSWORD`, `MAX_WATCHLISTS`, `PORT`.
 

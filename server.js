@@ -27,6 +27,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 /* ─── Changelog ──────────────────────────────────────────────────────────── */
 
 const CHANGELOG = [
+  { version: 'v4.3', changes: 'Hledání respektuje celé zadání – API Černého Rytíře hledá po jednotlivých slovech, takže "lightning bolt" vracelo i Lightning Greaves; přehlednější watchlist – jeden sloupec na eshop, kvalita/cena/sklad v jednom řádku, skladem vždy vidět, vyprodané sbalené' },
   { version: 'v4.2', changes: 'Černý Rytíř spustil nový web – CR modul přepsán na jeho veřejné API, reálné kvality NM/LP/PL, opraven Island bug' },
   { version: 'v4.1', changes: 'CR scraper přepsán z Playwright/Chromium na fetch + cheerio – eliminace 290 MB browser binárky, podpora free hostingu, rychlejší start' },
   { version: 'v4.0', changes: 'Known Issues přeorganizovány do sekcí dle závažnosti (High / Medium / Low / Info)' },
