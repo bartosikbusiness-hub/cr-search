@@ -24,9 +24,13 @@ const DATA_DIR       = path.join(__dirname, 'data');
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Alias bez přípony – /admin funguje stejně jako /admin.html
+app.get('/admin', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+
 /* ─── Changelog ──────────────────────────────────────────────────────────── */
 
 const CHANGELOG = [
+  { version: 'v4.4', changes: 'Administrace dostupná i na /admin – dosud fungovala jen adresa s příponou /admin.html' },
   { version: 'v4.3', changes: 'Hledání respektuje celé zadání – API Černého Rytíře hledá po jednotlivých slovech, takže "lightning bolt" vracelo i Lightning Greaves; přehlednější watchlist – jeden sloupec na eshop, kvalita/cena/sklad v jednom řádku, skladem vždy vidět, vyprodané sbalené' },
   { version: 'v4.2', changes: 'Černý Rytíř spustil nový web – CR modul přepsán na jeho veřejné API, reálné kvality NM/LP/PL, opraven Island bug' },
   { version: 'v4.1', changes: 'CR scraper přepsán z Playwright/Chromium na fetch + cheerio – eliminace 290 MB browser binárky, podpora free hostingu, rychlejší start' },
