@@ -1,37 +1,5 @@
-# Changelog – CR Search
+# Changelog
 
-## v3.4 (2026-03-26)
-- Aplikace přejmenována na **Premodern**
-- Přidána sekce **O aplikaci** (🧙) na hlavní stránce i v admin panelu
-- Known Issues a Changelog tlačítka přidána do admin panelu
-- Aktualizovány popisky v About: Pre-Modern filtr a import ze seznamu karet
+Historie verzí je vedená na jednom místě, přímo v aplikaci: tlačítko **Changelog** v hlavičce www.premodern.cz (API: `/api/changelog`). Zdrojem je pole `CHANGELOG` v `server.js`, kam se s každou změnou přidává nová verze nahoru.
 
-## v3.3 (2026-03-26)
-- Admin panel: nový sloupec **Heslo** zobrazuje plaintext heslo watchlistu
-- DB migrace: přidán sloupec `password_plain` do tabulky `watchlists`
-- Watchlisty vytvořené před touto verzí zobrazují `–` (heslo nebylo ukládáno)
-
-## v3.2 (2026-03-26)
-- Pojmenování watchlistu (volitelný název při vytváření)
-- Multi-edition picker pro přidávání karet (výběr více edic najednou)
-- Known Issues panel v UI
-
-## v3.1 (2026-03-26)
-- Import karet z Moxfieldu
-- Scryfall auto-detekce edic při importu
-
-## v2.5 (2026-03-26)
-- Zelené zvýraznění řádku watchlistu pokud je karta skladem alespoň na jednom shopu
-
-## v2.4 (2026-03-26)
-- Watchlist zobrazuje všechny naskladněné kvality z Najády
-
-## v2.3 (2026-03-26)
-- Abecední řazení dropdown edic
-
-## v2.2 (2026-03-26)
-- Rozšíření edic: Alpha/Beta/Unlimited/Revised, Arabian Nights, Antiquities, Legends, The Dark, Fallen Empires, FBB/ABB
-- Oprava isPremodern (startsWith matching)
-
-## v1.0
-- Základní CR Search: PreModern filter, vyhledávání, watchlist
+Tento soubor se záměrně neudržuje, aby se dvě verze historie nerozjížděly. Naposledy byl doplňován u v3.4 (březen 2026).
