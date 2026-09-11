@@ -30,6 +30,7 @@ app.get('/admin', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'ad
 /* ─── Changelog ──────────────────────────────────────────────────────────── */
 
 const CHANGELOG = [
+  { version: 'v4.5', changes: 'Náhled karty při hoveru ukazuje správný tisk – u edic 3rd/4th/5th/6th/7th Edition se dřív zobrazoval nejnovější reprint (např. Dominaria United); CR výsledky používají přesné Scryfall ID, Najáda kód setu, ostatní rozšířenou tabulku názvů edic; když edici nejde určit, zobrazí se nejstarší premodern tisk; Nemesis má na Scryfallu kód nem (ne nms) – doplněno i pro import z Moxfieldu' },
   { version: 'v4.4', changes: 'Administrace dostupná i na /admin – dosud fungovala jen adresa s příponou /admin.html' },
   { version: 'v4.3', changes: 'Hledání respektuje celé zadání – API Černého Rytíře hledá po jednotlivých slovech, takže "lightning bolt" vracelo i Lightning Greaves; přehlednější watchlist – jeden sloupec na eshop, kvalita/cena/sklad v jednom řádku, skladem vždy vidět, vyprodané sbalené' },
   { version: 'v4.2', changes: 'Černý Rytíř spustil nový web – CR modul přepsán na jeho veřejné API, reálné kvality NM/LP/PL, opraven Island bug' },
@@ -239,12 +240,13 @@ function isPremodern(edition) {
 async function searchCR(q, { exactOnly = false } = {}) {
   const variants = await searchCardCR(q, { exactOnly });
   return variants.map(v => ({
-    name     : v.name,
-    edition  : v.edition,
-    price    : v.price,
-    quantity : v.stock,
-    condition: v.condition || '–',   // NM / LP / PL
-    foil     : v.foil || 'REGULAR',  // REGULAR / FOIL / ETCHED
+    name      : v.name,
+    edition   : v.edition,
+    price     : v.price,
+    quantity  : v.stock,
+    condition : v.condition || '–',   // NM / LP / PL
+    foil      : v.foil || 'REGULAR',  // REGULAR / FOIL / ETCHED
+    scryfallId: v.scryfallId || '',   // přesný tisk pro náhled karty (hover)
   }));
 }
 
@@ -270,10 +272,13 @@ async function searchNajada(query) {
     const edition = item.expansion?.localized_name || '';
     if (!isPremodern(edition)) continue;
 
+    const setCode = (item.expansion?.short_code || '').toLowerCase(); // Scryfall kód setu (5ED → 5ed) pro náhled karty
+
     for (const article of item.articles || []) {
       results.push({
         name     : item.localized_name || item.name,
         edition,
+        setCode,
         price    : article.effective_price_czk,
         quantity : article.total_availability || 0,
         condition: article.condition || '–',

@@ -833,7 +833,7 @@
 
   function qtyClass(q) { return q === 0 ? 'qty-zero' : q <= 3 ? 'qty-low' : 'qty-ok'; }
   function fmt(n)       { return (n || 0).toLocaleString('cs-CZ') + ' Kč'; }
-  function esc(s)       { return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function esc(s)       { return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function escRe(s)     { return (s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
   /* ── Init ── */
@@ -1039,7 +1039,7 @@
         const rowClass = c.quantity > 0 ? ' class="in-stock"' : '';
         return `<tr${rowClass}>
           <td class="col-num">${i + 1}</td>
-          <td class="col-name" data-card-name="${esc(c.name)}" data-card-edition="${esc(c.edition)}">${esc(c.name)}</td>
+          <td class="col-name" data-card-name="${esc(c.name)}" data-card-edition="${esc(c.edition)}" data-scryfall-id="${esc(c.scryfallId || '')}" data-set-code="${esc(c.setCode || '')}">${esc(c.name)}</td>
           <td class="col-edition">${esc(c.edition)}</td>
           <td>${condTag}</td>
           <td class="col-price">${fmt(c.price)}</td>
@@ -1196,20 +1196,126 @@
   let _hoverEl    = null;
   let EDITION_TO_SET = null; // builduje se lazy až po inicializaci SET_CODE_MAP
 
+  // Názvy edic tak, jak je píšou eshopy (CR: "5th Edition", Najáda: "Sixth Edition")
+  // i naše dropdowny ("Classic Sixth Edition") → Scryfall kód setu. Klíče jsou po normEdition().
+  // Tvar "kód:jazyk" znamená cizojazyčný set – hledá se tisk v daném jazyce s reálným skenem.
+  const EDITION_ALIASES = {
+    'alpha': 'lea',                 'limited edition alpha': 'lea',
+    'beta': 'leb',                  'limited edition beta': 'leb',
+    'unlimited': '2ed',             'unlimited edition': '2ed',
+    'revised': '3ed',               'revised edition': '3ed',   '3rd edition': '3ed',   'third edition': '3ed',
+    '4th edition': '4ed',           'fourth edition': '4ed',
+    '5th edition': '5ed',           'fifth edition': '5ed',
+    '6th edition': '6ed',           'sixth edition': '6ed',     'classic sixth': '6ed', 'classic sixth edition': '6ed',
+    '7th edition': '7ed',           'seventh edition': '7ed',
+    'legends italian': 'leg:it',        'italian legends': 'leg:it',  'leggende': 'leg:it',
+    'asian black bordered': '4bb:ja',   'asian bb': '4bb:ja',         // Fourth Edition Foreign Black Border (ja/zh/ko)
+    'foreign black bordered': 'fbb:it', 'fbb': 'fbb:it',              // Revised Foreign Black Border (it/fr/de)
+  };
+
+  // Kódy setů, které považujeme za premodern (pro fallback "nejstarší premodern tisk").
+  // Lazy – SET_CODE_MAP je v souboru definovaná až níž.
+  let PREMODERN_SET_CODES = null;
+  function getPremodernSetCodes() {
+    if (!PREMODERN_SET_CODES) {
+      PREMODERN_SET_CODES = new Set([
+        ...Object.keys(SET_CODE_MAP).filter(c => c !== 'RVR').map(c => c.toLowerCase()),
+        '4bb', 'fbb',
+      ]);
+    }
+    return PREMODERN_SET_CODES;
+  }
+
+  function normEdition(s) {
+    return (s || '').replace(/[´‘’ʼ`]/g, "'").toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
   function getEditionToSet() {
     if (EDITION_TO_SET) return EDITION_TO_SET;
     EDITION_TO_SET = {};
     for (const [code, name] of Object.entries(SET_CODE_MAP)) {
-      if (!EDITION_TO_SET[name]) EDITION_TO_SET[name] = code.toLowerCase();
+      const key = normEdition(name);
+      if (!EDITION_TO_SET[key]) EDITION_TO_SET[key] = code.toLowerCase();
     }
-    EDITION_TO_SET['Revised']                = '3ed';
-    EDITION_TO_SET['Alpha']                  = 'lea';
-    EDITION_TO_SET['Beta']                   = 'leb';
-    EDITION_TO_SET['Unlimited']              = '2ed';
-    EDITION_TO_SET['Legends Italian']        = 'lig';
-    EDITION_TO_SET['Asian Black Bordered']   = 'rin';
-    EDITION_TO_SET['Foreign Black Bordered'] = 'fbb';
+    Object.assign(EDITION_TO_SET, EDITION_ALIASES);
     return EDITION_TO_SET;
+  }
+
+  function editionToSetCode(edition) {
+    return getEditionToSet()[normEdition(edition)] || '';
+  }
+
+  // Scryfall má i tisky bez skenu (typicky cizojazyčné 4bb/fbb) – u nich vrací "placeholder":
+  // anglický obrázek správné edice s páskou "Localized Image Not Available". Správný set má přednost,
+  // proto placeholder použijeme, když v daném setu není žádný reálný sken.
+  function hasScan(card) {
+    return !!card && card.image_status !== 'placeholder' && card.image_status !== 'missing';
+  }
+
+  function scryfallImage(card) {
+    return card?.image_uris?.normal || card?.card_faces?.[0]?.image_uris?.normal || '';
+  }
+
+  async function scryfallSearch(query, extra = '') {
+    const r = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&unique=prints${extra}`);
+    return r.ok ? ((await r.json()).data || []) : [];
+  }
+
+  // Nejlepší tisk v rámci jednoho setu: sken v preferovaném jazyce → sken v jiném jazyce → placeholder → cokoliv.
+  function pickPrint(prints, lang) {
+    return prints.find(c => c.lang === lang && hasScan(c))
+        || prints.find(hasScan)
+        || prints.find(c => c.lang === lang)
+        || prints[0];
+  }
+
+  // Obrázek konkrétního setu. "kód:jazyk" = cizojazyčný set (4bb, fbb, italské Legends).
+  async function fetchSetImage(name, spec) {
+    const [code, lang] = spec.split(':');
+    if (!lang) {
+      const r = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}&set=${encodeURIComponent(code)}`);
+      return r.ok ? scryfallImage(await r.json()) : '';
+    }
+    const prints = await scryfallSearch(`!"${name}" e:${code}`, '&include_multilingual=true');
+    return scryfallImage(pickPrint(prints, lang));
+  }
+
+  // Když neznáme edici ani ID, vezmeme nejstarší premodern tisk (ne nejnovější reprint).
+  async function fetchOldestPremodernImage(name) {
+    const list      = await scryfallSearch(`!"${name}"`, '&order=released&dir=asc');
+    const premodern = getPremodernSetCodes();
+    const pick      = list.find(c => premodern.has(c.set) && hasScan(c)) || list.find(c => premodern.has(c.set)) || list[0];
+    return scryfallImage(pick);
+  }
+
+  // Priorita: přesné Scryfall ID (CR) → kód setu (Najáda, pak tabulka názvů edic) → nejstarší premodern tisk.
+  async function resolveCardImage({ name, edition, scryfallId, setCode }) {
+    // Najáda občas používá jiný kód než Scryfall (Nemesis: nem vs. nms) – proto zkoušíme i kód podle názvu edice.
+    const codes = [...new Set([setCode, editionToSetCode(edition)].filter(Boolean))];
+    const key   = scryfallId ? `id:${scryfallId}` : `${name}|${codes.join(',')}`;
+    if (_imgCache.has(key)) return _imgCache.get(key);
+
+    let url = '';
+    try {
+      if (scryfallId) {
+        const r = await fetch(`https://api.scryfall.com/cards/${encodeURIComponent(scryfallId)}`);
+        if (r.ok) {
+          const card = await r.json();
+          // Tisk bez skenu: zkusit sken téhož setu (třeba v jiném jazyce), jinak nechat placeholder správné edice.
+          url = hasScan(card)
+            ? scryfallImage(card)
+            : (await fetchSetImage(card.name || name, `${card.set}:${card.lang}`)) || scryfallImage(card);
+        }
+      }
+      for (const code of codes) {
+        if (url) break;
+        url = await fetchSetImage(name, code);
+      }
+      if (!url) url = await fetchOldestPremodernImage(name);
+    } catch { /* síť – bez náhledu */ }
+
+    if (url) _imgCache.set(key, url);
+    return url;
   }
 
   function getHoverEl() {
@@ -1222,34 +1328,22 @@
     return _hoverEl;
   }
 
-  document.addEventListener('mouseover', async e => {
+  document.addEventListener('mouseover', e => {
     const cell = e.target.closest('[data-card-name]');
     if (!cell) return;
-    const name    = cell.dataset.cardName;
-    const edition = cell.dataset.cardEdition || '';
-    const setCode = getEditionToSet()[edition] || '';
-    const cacheKey = `${name}|${setCode}`;
+    const info = {
+      name      : cell.dataset.cardName,
+      edition   : cell.dataset.cardEdition || '',
+      scryfallId: cell.dataset.scryfallId  || '',
+      setCode   : (cell.dataset.setCode || '').toLowerCase(),
+    };
     clearTimeout(_hoverTimer);
     _hoverTimer = setTimeout(async () => {
-      let url = _imgCache.get(cacheKey);
-      if (!url) {
-        try {
-          const setParam = setCode ? `&set=${setCode}` : '';
-          const r = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}${setParam}`);
-          if (!r.ok) {
-            // Fallback bez set kódu
-            const r2 = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`);
-            if (!r2.ok) return;
-            const d2 = await r2.json();
-            url = d2.image_uris?.normal || d2.card_faces?.[0]?.image_uris?.normal;
-          } else {
-            const d = await r.json();
-            url = d.image_uris?.normal || d.card_faces?.[0]?.image_uris?.normal;
-          }
-          if (url) _imgCache.set(cacheKey, url);
-        } catch { return; }
-      }
+      const url = await resolveCardImage(info);
       if (!url) return;
+      if (!cell.isConnected) return; // tabulka se mezitím překreslila
+      // Na zařízeních s myší neukazovat opožděný náhled, když kurzor mezitím odjel (na dotykových :hover nespoléhat)
+      if (window.matchMedia('(hover: hover)').matches && !cell.matches(':hover')) return;
       const el   = getHoverEl();
       el.querySelector('img').src = url;
       const rect = cell.getBoundingClientRect();
@@ -1320,7 +1414,7 @@
     'MIR':'Mirage','VIS':'Visions','WTH':'Weatherlight',
     'TMP':'Tempest','STH':'Stronghold','EXO':'Exodus',
     'USG':"Urza's Saga",'ULG':"Urza's Legacy",'UDS':"Urza's Destiny",
-    'MMQ':'Mercadian Masques','NMS':'Nemesis','PCY':'Prophecy',
+    'MMQ':'Mercadian Masques','NEM':'Nemesis','NMS':'Nemesis','PCY':'Prophecy', // Scryfall: nem, starší kód nms
     'INV':'Invasion','PLS':'Planeshift','APC':'Apocalypse',
     'ODY':'Odyssey','TOR':'Torment','JUD':'Judgment',
     'ONS':'Onslaught','LGN':'Legions','SCG':'Scourge',

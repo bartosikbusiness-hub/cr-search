@@ -35,7 +35,7 @@ Watchlist se testuje přes `POST /api/watchlist/create` (heslo = identita watchl
 - **Každá změna = nová verze** v poli `CHANGELOG` v `server.js`, česky, nahoře. Vyřešené položky se odstraňují z `KNOWN_ISSUES`.
 - Uživatelské texty jsou české, kód a komentáře taky.
 - Frontend drží zavedený styl: žádné závislosti, žádný build, template stringy a `esc()` na vkládaná data.
-- Eshopové výsledky mají jednotný tvar `{ name, edition, price, quantity, condition, foil, shop }`; filtr premodern edic dělá `isPremodern()`.
+- Eshopové výsledky mají jednotný tvar `{ name, edition, price, quantity, condition, foil, shop }`; filtr premodern edic dělá `isPremodern()`. Volitelně nesou `scryfallId` (CR) nebo `setCode` (Najáda) – frontend podle nich vybírá správný tisk pro náhled karty při hoveru; bez nich se edice mapuje přes `EDITION_ALIASES` v `index.html`.
 
 ## Nasazení
 
