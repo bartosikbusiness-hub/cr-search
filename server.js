@@ -30,6 +30,7 @@ app.get('/admin', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'ad
 /* ─── Changelog ──────────────────────────────────────────────────────────── */
 
 const CHANGELOG = [
+  { version: 'v4.6', changes: 'Odebráno Kolo štěstí a Kolo neštěstí' },
   { version: 'v4.5', changes: 'Náhled karty při hoveru ukazuje správný tisk – u edic 3rd/4th/5th/6th/7th Edition se dřív zobrazoval nejnovější reprint (např. Dominaria United); CR výsledky používají přesné Scryfall ID, Najáda kód setu, ostatní rozšířenou tabulku názvů edic; když edici nejde určit, zobrazí se nejstarší premodern tisk; Nemesis má na Scryfallu kód nem (ne nms) – doplněno i pro import z Moxfieldu' },
   { version: 'v4.4', changes: 'Administrace dostupná i na /admin – dosud fungovala jen adresa s příponou /admin.html' },
   { version: 'v4.3', changes: 'Hledání respektuje celé zadání – API Černého Rytíře hledá po jednotlivých slovech, takže "lightning bolt" vracelo i Lightning Greaves; přehlednější watchlist – jeden sloupec na eshop, kvalita/cena/sklad v jednom řádku, skladem vždy vidět, vyprodané sbalené' },
